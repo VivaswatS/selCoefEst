@@ -1,0 +1,37 @@
+---
+title: "Simulate Allele Age"
+date: "7/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Imports
+
+```{r}
+library(Rcpp)
+```
+
+*All calculations below are per-site/locus, $l$. Will port this into a global meta-function for ease of use later.* 
+
+# Picking $\gamma$
+
+Here, I pick the population scaled selection coefficient $\gamma = 2Ns \sim \text{Unif}(0.01, 0.1)$ to then use for simulating allele frequency $X$. 
+
+```{r}
+L<-100
+gamma<-runif(L, min=0.01, max=0.1)
+```
+
+# Simulating $X_l$
+
+Below, I will use the above $gamma_l$ value to simulate a starting allele frequency (present-day, $X_0$), and then let the population evolve (to either extinction or fixation). $$P(X_l | \gamma_l) \propto \frac{1}{X_l(1-X_l)}\frac{1-e^{-\gamma_l(1-X_l)}}{1-e^{-\gamma_l}}$$
+
+Using this likelihood, I can get the value of $X_l$ by normalizing and doing inverse tranform sampling. 
+
+```{r}
+X0<-
+
+```
