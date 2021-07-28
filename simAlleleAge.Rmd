@@ -27,7 +27,7 @@ N<-2500 # inds
 L<-200 
 
 # just pick a grid of values here, say, ~50
-gamma<-c(-exp(log(10)*seq(-2, 2, length.out=25)),0,exp(log(10)*seq(-2, 2, length.out=25)))
+gamma<-c(-exp(log(10)*seq(2, -2, length.out=25)),exp(log(10)*seq(-2, 2, length.out=25)))
 ```
 
 ## Simulating $X_l$
@@ -38,17 +38,46 @@ We need to normalize this function by dividing by $\int_{1/2N}^{1-1/2N} f(X_l | 
 
 Using this likelihood, I can get the value of $X_l$ by normalizing and doing inverse transform sampling. From WolframAlpha, the integral (also CDF) solves out to be $$F_{X_l}(y)=\frac{1}{1-e^{-\gamma}}\times[\text{Ei}(\gamma_l(y-1)) - e^{-\gamma}\text{Ei}(\gamma_l y) - \log y-1 + \log y]$$
 
-The following code chunk needs to be repeated for every value of $\gamma$. Farm it out to multiple processes?
+The following code chunk needs to be repeated for every value of $\gamma$. 
 
 ```{r}
-Xl<-(1:(2*N-1))/(2*N)
+Xl<-(2:(2*N-2))/(2*N)
+estimXl<-function(Xl, gamma, ndraws){
+    finalXl<-rep(0,length(gamma)*ndraws)
+    for(n in 1:length(gamma)){
+        lbscal<-expint_Ei(gamma[n]*(Xl[1]-1)) - exp(-gamma[n])*expint_Ei(gamma[n]*Xl[1]) - log(1-Xl[1]) + log(Xl[1])
+        scal.fact<-(expint_Ei(gamma[n]*(Xl[length(Xl)]-1)) - exp(-gamma[n])*expint_Ei(gamma[n]*Xl[length(Xl)]) - log(1-Xl[length(Xl)]) + log(Xl[length(Xl)])) - lbscal
+        
+        pXl<-(expint_Ei(gamma[n]*(Xl-1)) - exp(-gamma[n])*expint_Ei(gamma[n]*Xl) - log(1-Xl) + log(Xl) - lbscal)/scal.fact
+        
+        u<-runif(ndraws, 0, 1)
+        finalXl[((n-1)*ndraws+1):(n*ndraws)]<-Xl[sapply(u,function(x){which.min(abs(pXl-x))})]
+    }
+    return(finalXl)
+}
+
+system.time(finalXl<-estimXl(Xl,gamma,ndraws=1000))
+```
+
+Now, I have to add an extra column indicating the $\gamma$ value for each row (i.e., frequency). 
+
+```{r}
+finalXl<-cbind(finalXl, rep(gamma,1000))
+colnames(finalXl)<-c("Xl","gamma")
+```
+
+### Miscellaneous
+
+Testing bed for R function: 
+
+```{r}
 # need a scal.fact for each gamma value (removing 1/(1-exp(-gamma)) term since it cancels)
 scal.fact<-(expint_Ei(gamma*(Xl[length(Xl)]-1)) - exp(-gamma)*expint_Ei(gamma*Xl[length(Xl)]) - log(1-Xl[length(Xl)]) + log(Xl[length(Xl)])) -
     (expint_Ei(gamma*(Xl[1]-1)) - exp(-gamma)*expint_Ei(gamma*Xl[1]) - log(1-Xl[1]) + log(Xl[1]))
 
 # compute CDF 
-pXl<-(expint_Ei(gamma*(Xl-1)) - exp(-gamma)*expint_Ei(gamma*Xl) - log(1-Xl) + log(Xl)) -
-    (expint_Ei(gamma*(Xl[1]-1)) - exp(-gamma)*expint_Ei(gamma*Xl[1]) - log(1-Xl[1]) + log(Xl[1]))
+pXl<-(expint_Ei(gamma[2]*(Xl-1)) - exp(-gamma[2])*expint_Ei(gamma[2]*Xl) - log(1-Xl) + log(Xl)) -
+    (expint_Ei(gamma[2]*(Xl[1]-1)) - exp(-gamma[2])*expint_Ei(gamma[2]*Xl[1]) - log(1-Xl[1]) + log(Xl[1]))
 # normalize to 0-1 scale
 pXl<-pXl/scal.fact
 
@@ -57,6 +86,8 @@ u<-runif(2000,0,1)
 # find closest pXl value and map back to corresponding Xl
 Xl.dist<-Xl[which.min(abs(pXl-u))]
 ```
+
+The following code is ~6x slower than the vectorized R code *cry*
 
 ```{Rcpp}
 #include <Rcpp.h>
@@ -76,19 +107,15 @@ NumericVector estimXlcpp(NumericVector Xl, NumericVector gamma, int ndraws){
     
     Function e("expint_Ei");
     
-    float scalFact = 1.0;
-    float lbscal;
-    double d1, d2;
+    double scalFact = 1.0;
+    double lbscal;
     
     for(int n=0; n<nGamma; n++){
-        d1 = e(gamma[n]*Xl[0])[0];
-        d2 = e(gamma[n]*Xl[lenXl-1])[0];
-        lbscal = e(gamma[n]*(Xl[0]-1)) - exp(-gamma[n])*d1 - log(1-Xl[0]) + log(Xl[0]);
-        scalFact = e(gamma[n]*Xl[lenXl-1]) - exp(-gamma[n])*d2 - log(1-Xl[lenXl-1]) + log(Xl[lenXl-1]) - lbscal;
+        lbscal = Rcpp::as<double>(e(gamma[n]*(Xl[0]-1))) - std::exp(-gamma[n])*Rcpp::as<double>(e(gamma[n]*Xl[0])) - std::log(1-Xl[0]) + std::log(Xl[0]);
+        scalFact = Rcpp::as<double>(e(gamma[n]*Xl[lenXl-1])) - std::exp(-gamma[n])*Rcpp::as<double>(e(gamma[n]*Xl[lenXl-1])) - std::log(1-Xl[lenXl-1]) + std::log(Xl[lenXl-1]) - lbscal;
     
         for(int i=0; i<lenXl; i++){
-            d2 = Rcpp::as<double>(e(gamma[n]*Xl[i]));
-            pXl[i] = (e(gamma[n]*(Xl[i]-1)) - exp(-gamma[n])*d2 - log(1-Xl[i]) + log(Xl[i]) - lbscal)/scalFact;
+            pXl[i] = (Rcpp::as<double>(e(gamma[n]*(Xl[i]-1))) - std::exp(-gamma[n])*Rcpp::as<double>(e(gamma[n]*Xl[i])) - std::log(1-Xl[i]) + std::log(Xl[i]) - lbscal)/scalFact;
         }
         u = Rcpp::runif(ndraws, 0, 1);
         
@@ -111,6 +138,8 @@ X_{t+1} | X_t, \gamma \sim N(\mu_s, V_s) \\
 V_s = X_t(1-X_t)
 $$
 
+Prototpye R function below: 
+
 ```{r}
 alleleAge<-function(X0, gamma, N){
     gen<-0
@@ -126,6 +155,8 @@ alleleAge<-function(X0, gamma, N){
     return(gen)
 }
 ```
+
+I will run the below function for each of our training data points (~100k) to get allele age given $\gamma$ and $X_l$. Thankfully, this Rcpp function runs ~30x faster than the regular R function. 
 
 ```{Rcpp}
 #include <Rcpp.h>
@@ -145,4 +176,19 @@ int alleleAgecpp(float X0, float gamma, int N){
     }
     return gen;
 }
+```
+
+Time to farm out the above function to each row in the previous data frame:
+
+```{r}
+all.age<-apply(finalXl, 1, function(x) alleleAgecpp(x[1], x[2], N))
+finalXl<-cbind(finalXl, all.age)
+colnames(finalXl)[3]<-"al"
+```
+
+Writing into a file as training data:
+
+```{r}
+library(MASS)
+write.matrix(finalXl,file=paste0("traindata/trip-",Sys.Date(),".csv"),sep=",")
 ```
