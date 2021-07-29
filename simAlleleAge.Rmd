@@ -192,3 +192,27 @@ Writing into a file as training data:
 library(MASS)
 write.matrix(finalXl,file=paste0("traindata/trip-",Sys.Date(),".csv"),sep=",")
 ```
+
+## Comparison between theory and empirical draws
+
+Below, I will compare the expectation for allele age from diffusion theory for $h=1/2$ from Ewens 2008 (Eqn 5.54) for eventual loss of an allele, starting at initial frequency of $p$. 
+
+$$
+t^{**}(x;p) = 2\{e^{\gamma x}-1 \} \{e^{\gamma (1-x)}-1\}[\gamma x(1-x) (e^\gamma-1)]^{-1}
+$$
+
+Need to take the expectation of the above function between $1/2N$ and $p=X_l$, to find the actual expected allele age. (log in to midway2 and run mathematica module - no need to install on here for right now...)
+
+$$
+\bar t^{**}(x;p) = \int_{1/2N}^{p} x \times 2\{e^{\gamma x}-1 \} \{e^{\gamma (1-x)}-1\}[\gamma x(1-x) (e^\gamma-1)]^{-1} dx
+$$
+
+```{r}
+exp.al<-function(xl, gamma){
+    2*(expm1(gamma*xl))*(expm1(gamma*(1-xl)))/(gamma*xl*(1-xl)*expm1(gamma))
+}
+
+finalXl$exp.al<-rep(NA,nrow(finalXl))
+
+finalXl$exp.al<-apply(finalXl, 1, function(x){exp.al(x[1], x[2])})
+```
