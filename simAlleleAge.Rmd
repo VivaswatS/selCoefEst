@@ -201,18 +201,36 @@ $$
 t^{**}(x;p) = 2\{e^{\gamma x}-1 \} \{e^{\gamma (1-x)}-1\}[\gamma x(1-x) (e^\gamma-1)]^{-1}
 $$
 
-Need to take the expectation of the above function between $1/2N$ and $p=X_l$, to find the actual expected allele age. (log in to midway2 and run mathematica module - no need to install on here for right now...)
+Need to take the expectation of the above function between $1/2N$ and $p=X_l$, to find the actual expected allele age. 
 
 $$
-\bar t^{**}(x;p) = \int_{1/2N}^{p} x \times 2\{e^{\gamma x}-1 \} \{e^{\gamma (1-x)}-1\}[\gamma x(1-x) (e^\gamma-1)]^{-1} dx
+\bar t^{**}(x;p) = \int_{1/2N}^{p} 2\{e^{\gamma x}-1 \} \{e^{\gamma (1-x)}-1\}[\gamma x(1-x) (e^\gamma-1)]^{-1} dx + \\ \int_p^{1-1/2N} 2e^{-\gamma(1-x)} \{1-e^{-\gamma p}\}\{e^{\gamma(1-x)}-1\}^2 \times[\gamma x(1-x)(1-e^{-\gamma})(e^{\gamma(1-p)}-1)]^{-1}dx
 $$
+
+Using Mathematica, the expected value (from the definite integral) turned out to be: 
+```{r, fig.cap="From 1/2N to p"}
+knitr::include_graphics("~/Downloads/12ntop.png")
+```
+
+```{r, fig.cap="From p to 1-1/2N"}
+knitr::include_graphics("~/Downloads/pto12n.png")
+```
+
 
 ```{r}
-exp.al<-function(xl, gamma){
-    2*(expm1(gamma*xl))*(expm1(gamma*(1-xl)))/(gamma*xl*(1-xl)*expm1(gamma))
+exp.al<-function(p, gamma, N){
+    term1<--exp(gamma)*expint_Ei(gamma*(p-1)) + exp(gamma)*expint_Ei(-gamma*p) + expint_Ei(gamma*p) - expint_Ei(gamma*(1-p)) + (1+exp(gamma))*(log(1-p)-log(p))
+    term2<--exp(gamma)*expint_Ei(gamma*(0.5/N-1)) + exp(gamma)*expint_Ei(-gamma*0.5/N) + expint_Ei(gamma*0.5/N) - expint_Ei(gamma*(1-0.5/N)) + (1+exp(gamma))*(log(1-0.5/N)-log(0.5/N))
+    term3<--exp(gamma)*expint_Ei(-gamma*0.5/N) + exp(2*gamma)*expint_Ei(-gamma*(N-0.5)/N) + expint_Ei(gamma*(N-0.5)/N) - exp(gamma)*expint_Ei(gamma*0.5/N) + 2*exp(gamma)*(log(0.5/N)-log((N-0.5)/N))
+    term4<--exp(gamma)*expint_Ei(gamma*(p-1)) + exp(2*gamma)*expint_Ei(-gamma*p) + expint_Ei(gamma*p) - exp(gamma)*expint_Ei(gamma*(1-p)) + 2*exp(gamma)*(log(1-p)-log(p))
+    
+    return(-2*(term1-term2)/(gamma*expm1(gamma)) + 2*expm1(gamma*p)*(term3-term4)/(gamma*expm1(gamma)*(exp(gamma)-exp(gamma*p))))
 }
 
 finalXl$exp.al<-rep(NA,nrow(finalXl))
 
-finalXl$exp.al<-apply(finalXl, 1, function(x){exp.al(x[1], x[2])})
+finalXl$exp.al<-apply(finalXl, 1, function(x){exp.al(x[1], x[2], N)})
+finalXl$exp.al<-finalXl$exp.al*2*N
+
+plot(finalXl$al,finalXl$exp.al,pch=20,col="grey40",xlab="Simulated",ylab="Expected",main="Allele age")
 ```
