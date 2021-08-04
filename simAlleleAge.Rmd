@@ -186,6 +186,12 @@ finalXl<-cbind(finalXl, all.age)
 colnames(finalXl)[3]<-"al"
 ```
 
+Below code will compute the empirical expectation of the allele age over multiple (say, 50) realizations of the FIT simulations. 
+
+```{r}
+mean.all.age<-apply(finalXl, 1, function(x) mean(replicate(50,alleleAgecpp(x[1], x[2], N))))
+```
+
 Writing into a file as training data:
 
 ```{r}
@@ -204,7 +210,8 @@ $$
 Need to take the expectation of the above function between $1/2N$ and $p=X_l$, to find the actual expected allele age. 
 
 $$
-\bar t^{**}(x;p) = \int_{1/2N}^{p} 2\{e^{\gamma x}-1 \} \{e^{\gamma (1-x)}-1\}[\gamma x(1-x) (e^\gamma-1)]^{-1} dx + \\ \int_p^{1-1/2N} 2e^{-\gamma(1-x)} \{1-e^{-\gamma p}\}\{e^{\gamma(1-x)}-1\}^2 \times[\gamma x(1-x)(1-e^{-\gamma})(e^{\gamma(1-p)}-1)]^{-1}dx
+\bar t^{**}(p) = \int_{x_1}^{x_2} t^{**}(x; p) dx \\
+\bar t^{**}(p) = \int_{1/2N}^{p} 2\{e^{\gamma x}-1 \} \{e^{\gamma (1-x)}-1\}[\gamma x(1-x) (e^\gamma-1)]^{-1} dx + \\ \int_p^{1-1/2N} 2e^{-\gamma(1-x)} \{1-e^{-\gamma p}\}\{e^{\gamma(1-x)}-1\}^2 \times[\gamma x(1-x)(1-e^{-\gamma})(e^{\gamma(1-p)}-1)]^{-1}dx
 $$
 
 Using Mathematica, the expected value (from the definite integral) turned out to be: 
@@ -232,5 +239,5 @@ finalXl$exp.al<-rep(NA,nrow(finalXl))
 finalXl$exp.al<-apply(finalXl, 1, function(x){exp.al(x[1], x[2], N)})
 finalXl$exp.al<-finalXl$exp.al*2*N
 
-plot(finalXl$al,finalXl$exp.al,pch=20,col="grey40",xlab="Simulated",ylab="Expected",main="Allele age")
+plot(mean.all.age,finalXl$exp.al,pch=20,col="grey40",xlab="Mean of simulated",ylab="Expected",main="Allele age")
 ```
