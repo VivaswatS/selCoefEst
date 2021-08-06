@@ -241,3 +241,10 @@ finalXl$exp.al<-finalXl$exp.al*2*N
 
 plot(mean.all.age,finalXl$exp.al,pch=20,col="grey40",xlab="Mean of simulated",ylab="Expected",main="Allele age")
 ```
+
+There is quite a good correlation (~0.97) between mean allele age (from 50 sims) and 1 random draw from the distribution. 
+
+```{r}
+plot(mean.all.age,all.age,pch=20,col="grey40")
+abline(0,1,col="red",lty=2)
+```
