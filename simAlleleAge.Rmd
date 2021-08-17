@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(Rcpp)
 library(expint)
+library(MASS)
 ```
 
 *All calculations below are per-site/locus, $l$. Will port this into a global meta-function for ease of use later.* 
@@ -189,13 +190,31 @@ colnames(finalXl)[3]<-"al"
 Below code will compute the empirical expectation of the allele age over multiple (say, 50) realizations of the FIT simulations. 
 
 ```{r}
-mean.all.age<-apply(finalXl, 1, function(x) mean(replicate(50,alleleAgecpp(x[1], x[2], N))))
+mean.all.age<-apply(finalXl, 1, function(x) mean(replicate(50, alleleAgecpp(x[1], x[2], N))))
+```
+
+Obtain 200 samples from simulations for each pair and store it in a text file: to construct ECDF and check results with predictions with neural net. 
+
+```{r}
+sims.all.age<-apply(finalXl, 1, function(x) replicate(200, alleleAgecpp(x[1], x[2], N)))
+```
+
+Plotting a few example ECDFs and writing into a file: 
+
+```{r}
+par(mfrow=c(2,1))
+plot(ecdf(sims.all.age[,123]), col="grey40")
+text(max(sims.all.age[,123]),0.1, labels=paste0("Xl=",finalXl[123,1],"\ngamma=",finalXl[123,2]))
+
+plot(ecdf(sims.all.age[,45678]), col="grey40")
+text(max(sims.all.age[,45678]),0.1, labels=paste0("Xl=",finalXl[45678,1],"\ngamma=",finalXl[45678,2]))
+
+write.matrix(sims.all.age,file=paste0("traindata/sims-",Sys.Date(),".csv"),sep=",")
 ```
 
 Writing into a file as training data:
 
 ```{r}
-library(MASS)
 write.matrix(finalXl,file=paste0("traindata/trip-",Sys.Date(),".csv"),sep=",")
 ```
 
