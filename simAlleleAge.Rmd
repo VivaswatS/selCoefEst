@@ -267,3 +267,35 @@ There is quite a good correlation (~0.97) between mean allele age (from 50 sims)
 plot(mean.all.age,all.age,pch=20,col="grey40")
 abline(0,1,col="red",lty=2)
 ```
+
+## Obtaining likelihood estimates 
+
+Below, I will find likelihood values for $\mathcal{L}(\gamma \vert X)$ and $\mathcal{L}(\gamma \vert X, a)$ to obtain increase in accuracy of estimation (quantified using Fisher information matrix?)
+
+*Picking a $\gamma=-10$*
+
+Remember: for a range of observations/frequencies $X_1, X_2, \ldots, X_n$ then $\log \mathcal{L}(\gamma \vert \mathbf{X}) = \sum_{i=1}^n \log {L}(\gamma \vert X_i)$ 
+
+```{r}
+# getting the data (i.e., subsetting for the appropriate value of gamma)
+Xlred<-exp(preds[preds$V2==-10,1])
+logal.mured<-log(preds[preds$V2==-10,3])
+logal.sdred<-preds[preds$V2==-10,4]
+```
+
+```{r}
+# function to obtain/plot likelihood values for a range of gamma, given a a set of freqs Xl
+# (take the ratio first and then log)
+plot_loglik_xl<-function(gamma, xl){
+    sapply(gamma, function(g){sum(log((1-exp(-2*g*(1-xl)))/(1-exp(-2*g))))}) - sum(log(xl)) - sum(log(1-xl))
+}
+```
+
+Need predictions from other values of gamma and Xl as well...
+
+```{r}
+# pass in with same order of Xl and gamma
+plot_loglik_al<-function(al, al.mu, al.sd){
+    sapply(gamma, function(g){sum(dnorm(log(al),al.mu,al.sd,log=T))})
+}
+```
