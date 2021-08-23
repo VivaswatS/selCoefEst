@@ -49,7 +49,7 @@ estimXl<-function(Xl, gamma, ndraws){
         lbscal<-expint_Ei(gamma[n]*(Xl[1]-1)) - exp(-gamma[n])*expint_Ei(gamma[n]*Xl[1]) - log(1-Xl[1]) + log(Xl[1])
         scal.fact<-(expint_Ei(gamma[n]*(Xl[length(Xl)]-1)) - exp(-gamma[n])*expint_Ei(gamma[n]*Xl[length(Xl)]) - log(1-Xl[length(Xl)]) + log(Xl[length(Xl)])) - lbscal
         
-        pXl<-(expint_Ei(gamma[n]*(Xl-1)) - exp(-gamma[n])*expint_Ei(gamma[n]*Xl) - log(1-Xl) + log(Xl) - lbscal)/scal.fact
+        pXl<-(expint_Ei(gamma[n]*(Xl-1)) - exp(-gamma[n])*expint_Ei(gamma[n]*Xl) - log(1-Xl) + log(Xl) - lbscal)/scal.fact #does this need to be here: /(1-exp(-gamma[n]))?
         
         u<-runif(ndraws, 0, 1)
         finalXl[((n-1)*ndraws+1):(n*ndraws)]<-Xl[sapply(u,function(x){which.min(abs(pXl-x))})]
@@ -72,7 +72,7 @@ colnames(finalXl)<-c("Xl","gamma")
 Testing bed for R function: 
 
 ```{r}
-# need a scal.fact for each gamma value (removing 1/(1-exp(-gamma)) term since it cancels)
+# need a scal.fact for each gamma value 
 scal.fact<-(expint_Ei(gamma*(Xl[length(Xl)]-1)) - exp(-gamma)*expint_Ei(gamma*Xl[length(Xl)]) - log(1-Xl[length(Xl)]) + log(Xl[length(Xl)])) -
     (expint_Ei(gamma*(Xl[1]-1)) - exp(-gamma)*expint_Ei(gamma*Xl[1]) - log(1-Xl[1]) + log(Xl[1]))
 
