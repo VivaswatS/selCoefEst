@@ -139,7 +139,7 @@ X_{t+1} | X_t, \gamma \sim N(\mu_s, V_s) \\
 V_s = X_t(1-X_t)
 $$
 
-Prototpye R function below: 
+Prototype R function below: 
 
 ```{r}
 alleleAge<-function(X0, gamma, N){
@@ -173,7 +173,7 @@ int alleleAgecpp(float X0, float gamma, int N){
         gen++;
         
         mu = Xt - 0.25*gamma*Xt*(1-Xt)/tanh(0.5*gamma*(1-Xt))/N;
-        Xt = R::rnorm(mu, sqrt(Xt*(1-Xt))*0.5/N);
+        Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
     }
     return gen;
 }
@@ -238,7 +238,7 @@ Using Mathematica, the expected value (from the definite integral) turned out to
 knitr::include_graphics("~/Downloads/12ntop.png")
 ```
 
-```{r, fig.cap="From p to 1-1/2N"}
+```{r fig.cap="From}
 knitr::include_graphics("~/Downloads/pto12n.png")
 ```
 
@@ -253,12 +253,11 @@ exp.al<-function(p, gamma, N){
     return(-2*(term1-term2)/(gamma*expm1(gamma)) + 2*expm1(gamma*p)*(term3-term4)/(gamma*expm1(gamma)*(exp(gamma)-exp(gamma*p))))
 }
 
-finalXl$exp.al<-rep(NA,nrow(finalXl))
+finalXl<-cbind(finalXl, apply(finalXl, 1, function(x){exp.al(x[1], x[2], N)}))
+colnames(finalXl)[4]<-"exp.al"
+finalXl[,4]<-finalXl[,4]*2*N
 
-finalXl$exp.al<-apply(finalXl, 1, function(x){exp.al(x[1], x[2], N)})
-finalXl$exp.al<-finalXl$exp.al*2*N
-
-plot(mean.all.age,finalXl$exp.al,pch=20,col="grey40",xlab="Mean of simulated",ylab="Expected",main="Allele age")
+plot(log(finalXl[,5]),log(finalXl[,4]),pch=20,col="grey40",xlab="Mean of simulated",ylab="Expected",main="Allele age")
 ```
 
 There is quite a good correlation (~0.97) between mean allele age (from 50 sims) and 1 random draw from the distribution. 
@@ -297,5 +296,67 @@ Need predictions from other values of gamma and Xl as well...
 # pass in with same order of Xl and gamma
 plot_loglik_al<-function(al, al.mu, al.sd){
     sapply(gamma, function(g){sum(dnorm(log(al),al.mu,al.sd,log=T))})
+}
+```
+
+## Resimulating using forward equations
+
+Below, I will run the sims with start freq $X_0 = 1/2N$ and record allele ages at random intervals. 
+
+$$X_{t+1} \vert X_t \sim \mathcal{N}(\mu_s, V_s) \\
+\mu_s = X_t + \frac{\gamma X_t (1-X_t)}{4N-2\gamma(1-X_t)} \\
+V_s = X_t(1-X_t)$$
+
+```{Rcpp}
+#include <Rcpp.h>
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+List getAlleleAgecpp(float gamma, int N, int ndraws){
+    int gen;
+    int i = 0;
+    double Xt;
+    double mu = 0.0;
+    
+    NumericVector age(ndraws); 
+    NumericVector Xl(ndraws);
+    
+    NumericMatrix sims(ndraws, 1000);
+    
+    restart:
+    Xt = 0.5/N;
+    for(gen=1; gen<50000; gen++){
+        mu = Xt + 0.5*gamma*Xt*(1-Xt)/(2*N-gamma*(1-Xt));
+        Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
+        
+        if(Xt < 0.5/N)
+            goto restart;
+        
+        if(gen>50 && R::rbinom(1,0.05)){
+            age[i] = gen;
+            Xl[i] = Xt;
+            
+            if(i<ndraws)
+                i++;
+            else
+                break;
+        }
+    }
+    
+    List ret; 
+    ret["age"]= age;
+    ret["Xl"] = Xl;
+    
+    return ret;
+}
+```
+
+Below, I will get the $(X_l, a_l)$ combination for each value of $\gamma$. 
+
+```{r}
+newfinalXl<-finalXl
+newfinalXl[,2]<-rep(gamma,1,each=1000)
+for(n in 1:length(gamma)){
+    newfinalXl[((n-1)*1000+1):(n*1000),c(3,1)]<-getAlleleAgecpp(gamma[n], N, 1000)
 }
 ```
