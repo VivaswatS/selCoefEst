@@ -313,20 +313,46 @@ using namespace Rcpp;
 
 // [[Rcpp::export]]
 List getAlleleAgecpp(float gamma, int N, int ndraws){
-    int gen;
+    int gen, lky;
     int i = 0;
-    double Xt;
+    double Xt = 0.5/N;
     double mu = 0.0;
+    
+    NumericVector sim(50000);
     
     NumericVector age(ndraws); 
     NumericVector Xl(ndraws);
     
-    NumericMatrix sims(ndraws, 1000);
+    restart:
+    sim[0] = 0.5/N;
+    for(gen=1; gen<50000; gen++){
+        mu = Xt + 0.25*gamma*Xt*(1-Xt)/N;
+        Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
+        
+        if(Xt < 0.5/N || Xt > (N-0.5/N)){
+            lky = Rcpp::RcppArmadillo::sample(gen-1,1);
+            age[i] = sim[lky];
+            Xl[i] = lky;
+            goto restart;
+        }
+        else{
+            sim[gen] = Xt;
+        }
+    }
+
+    List ret; 
+    ret["age"]= age;
+    ret["Xl"] = Xl;
     
+    return ret;
+}
+```
+
+```{r, eval=FALSE}
     restart:
     Xt = 0.5/N;
     for(gen=1; gen<50000; gen++){
-        mu = Xt + 0.5*gamma*Xt*(1-Xt)/(2*N-gamma*(1-Xt));
+        mu = Xt + 0.25*gamma*Xt*(1-Xt)/N;
         Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
         
         if(Xt < 0.5/N)
@@ -342,13 +368,6 @@ List getAlleleAgecpp(float gamma, int N, int ndraws){
                 break;
         }
     }
-    
-    List ret; 
-    ret["age"]= age;
-    ret["Xl"] = Xl;
-    
-    return ret;
-}
 ```
 
 Below, I will get the $(X_l, a_l)$ combination for each value of $\gamma$. 
@@ -359,4 +378,24 @@ newfinalXl[,2]<-rep(gamma,1,each=1000)
 for(n in 1:length(gamma)){
     newfinalXl[((n-1)*1000+1):(n*1000),c(3,1)]<-getAlleleAgecpp(gamma[n], N, 1000)
 }
+```
+
+### Comparing between the two methods for simulation
+
+```{r}
+plot(sort(newfinalXl[newfinalXl$gamma==gamma[7],1]), sort(finalXl[finalXl$gamma==gamma[7],1]), col='grey', main=paste0("Xl, gamma=",gamma[7]), ylab="backward approx", xlab="FIT sims")
+
+plot(sort(newfinalXl[newfinalXl$gamma==gamma[7],3]), sort(finalXl[finalXl$gamma==gamma[7],3]), col='grey', main=paste0("al, gamma=",gamma[7]), ylab="backward approx", xlab="FIT sims")
+```
+
+
+```{r}
+plot(sort(newfinalXl[newfinalXl$gamma==gamma[17],1]), sort(finalXl[finalXl$gamma==gamma[17],1]), col='grey', main=paste0("Xl, gamma=",gamma[17]), ylab="backward approx", xlab="FIT sims")
+
+plot(sort(newfinalXl[newfinalXl$gamma==gamma[17],3]), sort(finalXl[finalXl$gamma==gamma[17],3]), col='grey', main=paste0("al, gamma=",gamma[17]), ylab="backward approx", xlab="FIT sims")
+```
+
+```{r}
+hist(finalXl[finalXl$Xl>0.1&finalXl$Xl<0.2,3])
+hist(newfinalXl[newfinalXl$Xl>0.1&newfinalXl$Xl<0.2,3],col='grey')
 ```
