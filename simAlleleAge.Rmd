@@ -1,7 +1,7 @@
 ---
 title: "Simulate Allele Age"
 date: "7/26/2021"
-output: html_document
+output: rmarkdown::github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -257,7 +257,7 @@ finalXl<-cbind(finalXl, apply(finalXl, 1, function(x){exp.al(x[1], x[2], N)}))
 colnames(finalXl)[4]<-"exp.al"
 finalXl[,4]<-finalXl[,4]*2*N
 
-plot(log(finalXl[,5]),log(finalXl[,4]),pch=20,col="grey40",xlab="Mean of simulated",ylab="Expected",main="Allele age")
+plot(log(newfinalXl[,3]),log(finalXl[,4]),pch=20,col="grey40",xlab="Mean of simulated",ylab="Expected",main="Allele age")
 ```
 
 There is quite a good correlation (~0.97) between mean allele age (from 50 sims) and 1 random draw from the distribution. 
@@ -312,8 +312,9 @@ V_s = X_t(1-X_t)$$
 using namespace Rcpp;
 
 // [[Rcpp::export]]
-List getAlleleAgecpp(float gamma, int N, int ndraws){
-    int gen, lky;
+NumericMatrix getAlleleAgecpp(float gamma, int N, int ndraws){
+    int gen;
+    IntegerVector lky; 
     int i = 0;
     double Xt = 0.5/N;
     double mu = 0.0;
@@ -323,26 +324,29 @@ List getAlleleAgecpp(float gamma, int N, int ndraws){
     NumericVector age(ndraws); 
     NumericVector Xl(ndraws);
     
-    restart:
-    sim[0] = 0.5/N;
-    for(gen=1; gen<50000; gen++){
-        mu = Xt + 0.25*gamma*Xt*(1-Xt)/N;
-        Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
-        
-        if(Xt < 0.5/N || Xt > (N-0.5/N)){
-            lky = Rcpp::RcppArmadillo::sample(gen-1,1);
-            age[i] = sim[lky];
-            Xl[i] = lky;
-            goto restart;
+    while(i < ndraws){
+        Xt = 0.5/N;
+        std::fill(sim.begin(), sim.end(), 0);
+        for(gen=1; gen<50000; gen++){
+            mu = Xt + 0.25*gamma*Xt*(1-Xt)/N;
+            Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
+            
+            sim[gen] = Xt; 
+            
+            if(Xt < 0.5/N || Xt > 1-0.5/N)
+                break;
         }
-        else{
-            sim[gen] = Xt;
+        if(gen > 5){
+            lky = Rcpp::sample(gen-1, 1);
+            age[i] = lky[0];
+            Xl[i] = sim[lky[0]];
+            i++;
         }
     }
-
-    List ret; 
-    ret["age"]= age;
-    ret["Xl"] = Xl;
+    
+    NumericMatrix ret(ndraws, 2); 
+    ret(_,0) = Xl;
+    ret(_,1) = age;
     
     return ret;
 }
@@ -376,8 +380,26 @@ Below, I will get the $(X_l, a_l)$ combination for each value of $\gamma$.
 newfinalXl<-finalXl
 newfinalXl[,2]<-rep(gamma,1,each=1000)
 for(n in 1:length(gamma)){
-    newfinalXl[((n-1)*1000+1):(n*1000),c(3,1)]<-getAlleleAgecpp(gamma[n], N, 1000)
+    newfinalXl[((n-1)*1000+1):(n*1000),c(1,3)]<-getAlleleAgecpp(gamma[n], N, 1000)
 }
+hist2d(log10(newfinalXl[,1]),log10(newfinalXl[,3]),nbins=c(50,50),xlab='log-freq',ylab='log-age')
+```
+
+### Combining three data sets into a final training data set
+
+Below I will combine with 400/300/300 on the 5/50/500 gens data sets. 
+
+```{r}
+final.data<-matrix(0, nrow=nrow(newfinalXl), 3)
+for(n in 1:length(gamma)){
+    final.data[((n-1)*1000+1):(n*1000),]<-rbind(
+        newfinalXl[newfinalXl[,2]==gamma[n],][sample(1:1000,400),1:3],
+        newfinalXl50[newfinalXl50[,2]==gamma[n],][sample(1:1000,300),1:3],
+        newfinalXl500[newfinalXl500[,2]==gamma[n],][sample(1:1000,300),1:3])
+}
+colnames(final.data)<-c("Xl","gamma","al")
+# most data points at low freqs and low ages but good spread...
+hist2d(log10(final.data[,1]),log10(final.data[,3]),nbins=c(50,50),xlab='log-freq',ylab='log-age')
 ```
 
 ### Comparing between the two methods for simulation
@@ -399,3 +421,4 @@ plot(sort(newfinalXl[newfinalXl$gamma==gamma[17],3]), sort(finalXl[finalXl$gamma
 hist(finalXl[finalXl$Xl>0.1&finalXl$Xl<0.2,3])
 hist(newfinalXl[newfinalXl$Xl>0.1&newfinalXl$Xl<0.2,3],col='grey')
 ```
+
