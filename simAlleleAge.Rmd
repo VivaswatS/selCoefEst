@@ -257,7 +257,7 @@ finalXl<-cbind(finalXl, apply(finalXl, 1, function(x){exp.al(x[1], x[2], N)}))
 colnames(finalXl)[4]<-"exp.al"
 finalXl[,4]<-finalXl[,4]*2*N
 
-plot(log(newfinalXl[,3]),log(finalXl[,4]),pch=20,col="grey40",xlab="Mean of simulated",ylab="Expected",main="Allele age")
+plot(log(finalXl[,5]),log(finalXl[,4]),pch=20,col="grey40",xlab="Mean of simulated",ylab="Expected",main="Allele age")
 ```
 
 There is quite a good correlation (~0.97) between mean allele age (from 50 sims) and 1 random draw from the distribution. 
@@ -400,6 +400,23 @@ for(n in 1:length(gamma)){
 colnames(final.data)<-c("Xl","gamma","al")
 # most data points at low freqs and low ages but good spread...
 hist2d(log10(final.data[,1]),log10(final.data[,3]),nbins=c(50,50),xlab='log-freq',ylab='log-age')
+```
+
+Comparing with expectation from the integral of the PDF:
+
+*(correlation is very low, need to recheck this...)*
+
+```{r}
+final.data<-cbind(final.data, apply(final.data, 1, function(x){exp.al(x[1], x[2], N)}))
+colnames(final.data)[4]<-"exp.al"
+final.data[,4]<-final.data[,4]*2*N
+plot(final.data[,4],finalXl[,3],pch=20,col="grey40",ylab="Simulated",xlab="Expected",main="Allele age")
+```
+
+Writing data out into a text file:
+
+```{r}
+write.matrix(final.data,file=paste0("traindata/trip-",Sys.Date(),".csv"),sep=",")
 ```
 
 ### Comparing between the two methods for simulation
