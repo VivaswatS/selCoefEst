@@ -404,13 +404,13 @@ hist2d(log10(final.data[,1]),log10(final.data[,3]),nbins=c(50,50),xlab='log-freq
 
 Comparing with expectation from the integral of the PDF:
 
-*(correlation is very low, need to recheck this...)*
+*(correlation is ~0.74, some outliers in the simulated but that's expected...(however, simulated is 2x - variance is high?)*
 
 ```{r}
 final.data<-cbind(final.data, apply(final.data, 1, function(x){exp.al(x[1], x[2], N)}))
 colnames(final.data)[4]<-"exp.al"
 final.data[,4]<-final.data[,4]*2*N
-plot(final.data[,4],finalXl[,3],pch=20,col="grey40",ylab="Simulated",xlab="Expected",main="Allele age")
+plot(log(final.data[,4]),log(final.data[,3]),pch=20,col="grey40",ylab="Simulated",xlab="Expected",main="Allele age")
 ```
 
 Writing data out into a text file:
