@@ -202,7 +202,7 @@ int alleleAgecpp(float X0, float gamma, int N){
         gen++;
         
         mu = Xt - 0.25*gamma*Xt*(1-Xt)/tanh(0.25*gamma*(1-Xt))/N;
-        Xt = R::rnorm(mu, sqrt(Xt*(1-Xt))*0.5/N);
+        Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
     }  
     
     return gen;
@@ -224,6 +224,7 @@ multiple (say, 50) realizations of the FIT simulations.
 
 ``` r
 mean.all.age<-apply(finalXl, 1, function(x) mean(replicate(50, alleleAgecpp(x[1], x[2], N))))
+mean.all.age[mean.all.age==0]<-1
 ```
 
 Obtain 200 samples from simulations for each pair and store it in a text
@@ -244,7 +245,7 @@ text(max(sims.all.age[,123]),0.1, labels=paste0("Xl=",finalXl[123,1],"\ngamma=",
 # plot(ecdf(sims.all.age[,45678]), col="grey40")
 # text(max(sims.all.age[,45678]),0.1, labels=paste0("Xl=",finalXl[45678,1],"\ngamma=",finalXl[45678,2]))
 # 
-# write.matrix(sims.all.age,file=paste0("traindata/sims-",Sys.Date(),".csv"),sep=",")
+write.matrix(sims.all.age,file=paste0("traindata/sims-",Sys.Date(),".csv"),sep=",")
 ```
 
 ![](simAlleleAge_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
@@ -252,7 +253,7 @@ text(max(sims.all.age[,123]),0.1, labels=paste0("Xl=",finalXl[123,1],"\ngamma=",
 Writing into a file as training data:
 
 ``` r
-# write.matrix(finalXl,file=paste0("traindata/trip-",Sys.Date(),".csv"),sep=",")
+write.matrix(finalXl,file=paste0("traindata/trip-",Sys.Date(),".csv"),sep=",")
 ```
 
 ## Comparison between theory and empirical draws
@@ -321,7 +322,7 @@ exp.al<-function(p, gamma, N){
     term4<--exp(gamma)*expint_Ei(gamma*(p-1)) + exp(2*gamma)*expint_Ei(-gamma*p) + expint_Ei(gamma*p) - exp(gamma)*expint_Ei(gamma*(1-p)) + 2*exp(gamma)*(log(1-p)-log(p))
     
     
-    return(-2*(term2-term1)/(gamma*expm1(gamma)) - 2*expm1(gamma*p)*(term4-term3)/(gamma*expm1(gamma)*(exp(gamma)-exp(gamma*p))))
+    return(2*(term1-term2)/(gamma*expm1(gamma)) - 2*expm1(gamma*p)*(term4-term3)/(gamma*expm1(gamma)*(exp(gamma)-exp(gamma*p))))
 }
 
 finalXl<-cbind(finalXl, apply(finalXl, 1, function(x){exp.al(x[1], x[2], N)}))
@@ -336,15 +337,16 @@ from theory (points colored based on frequency:
 ``` r
 rbPal <- colorRampPalette(c('grey','black'))
 par(mfrow=c(1,2))
-plot(log(finalXl[,4]),log(mean.all.age),pch=20,xlab="Expected",ylab="Mean of simulated",main="Allele age",col=rbPal(10)[as.numeric(cut(abs(finalXl[,4]),breaks = 20))])
+plot(log(finalXl[,4]),log(mean.all.age),pch=20,xlab="Expected",ylab="Mean of simulated",main="Allele age",col=rbPal(10)[as.numeric(cut(abs(finalXl[,2]),breaks = 20))])
 abline(0,1,col='red',lty=2)
 plot(finalXl[,4],mean.all.age,pch=20,xlab="Expected",ylab="Mean of simulated",main="Allele age",col='grey40')
+abline(0,1,col='red',lty=2)
 ```
 
 ![](simAlleleAge_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
 ``` r
-plot(finalXl[,4],all.age,pch=20,col='grey40',xlab='Expected',ylab='Single draw')
+plot(log(finalXl[,4]),log(all.age),pch=20,col='grey40',xlab='Expected',ylab='Single draw')
 abline(0,1,col='red',lty=2)
 ```
 
@@ -527,41 +529,56 @@ Reading in simulated data from before:
 newfinalXl<-read.csv("traindata/trip-2021-08-25.csv")
 ```
 
+Method: For a given freq in the FIT sims find a freq(s) that is close to
+the given and compare the allele ages between the two. Do this
+separately for each selection coefficient \(\gamma\).
+
+``` r
+# comparisons for gamma=-10
+didx<-matrix(nrow=1000,ncol=2)
+for(i in 1:1000){
+    startidx<-6000 # for gamma=-10
+    didx[i,1]<-which.min(abs(newfinalXl[newfinalXl$gamma==-10,1]-finalXl[i,1])) + startidx
+    didx[i,2]<-min(abs(newfinalXl[newfinalXl$gamma==-10,1]-finalXl[i,1]))
+}
+plot(finalXl[finalXl$gamma==gamma[7],3],newfinalXl[didx,3],pch=20,xlab='Backward approx',ylab='FIT',main='Estimated allele age for similar freq & gamma=-10',col=rbPal(10)[cut(log(didx[,2]),breaks = 10)])
+```
+
 ``` r
 finalXl<-as.data.frame(finalXl)
 plot(sort(newfinalXl[newfinalXl$gamma==-10,1]), sort(finalXl[finalXl$gamma==gamma[7],1]), col='grey', main=paste0("Xl, gamma=",gamma[7]), ylab="backward approx", xlab="FIT sims")
 abline(0,1,col='red',lty=2)
 ```
 
-![](simAlleleAge_files/figure-gfm/unnamed-chunk-27-1.png)<!-- -->
+![](simAlleleAge_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
 
 ``` r
 plot(sort(newfinalXl[newfinalXl$gamma==-10,3]), sort(finalXl[finalXl["gamma"]==gamma[7],3]), col='grey', main=paste0("al, gamma=",gamma[7]), ylab="backward approx", xlab="FIT sims")
 abline(0,1,col='red',lty=2)
 ```
 
-![](simAlleleAge_files/figure-gfm/unnamed-chunk-27-2.png)<!-- -->
+![](simAlleleAge_files/figure-gfm/unnamed-chunk-28-2.png)<!-- -->
 
 ``` r
 plot(sort(newfinalXl[newfinalXl$gamma==-0.2154435,1]), sort(finalXl[finalXl$gamma==gamma[17],1]), col='grey', main=paste0("Xl, gamma=",gamma[17]), ylab="backward approx", xlab="FIT sims")
 ```
 
-![](simAlleleAge_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
+![](simAlleleAge_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
 
 ``` r
 plot(sort(newfinalXl[newfinalXl$gamma==-0.2154435,3]), sort(finalXl[finalXl$gamma==gamma[17],3]), col='grey', main=paste0("al, gamma=",gamma[17]), ylab="backward approx", xlab="FIT sims")
 ```
 
-![](simAlleleAge_files/figure-gfm/unnamed-chunk-28-2.png)<!-- -->
+![](simAlleleAge_files/figure-gfm/unnamed-chunk-29-2.png)<!-- -->
 
 ``` r
 hist(finalXl[finalXl$Xl>0.1&finalXl$Xl<0.2&finalXl$gamma==gamma[7],3],main='bakward approx. age')
 ```
 
-![](simAlleleAge_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
+![](simAlleleAge_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
 
 ``` r
 hist(newfinalXl[newfinalXl$Xl>0.1&newfinalXl$Xl<0.2&newfinalXl$gamma==-10,3],col='grey',main='FIT sim. age')
 ```
 
-![](simAlleleAge_files/figure-gfm/unnamed-chunk-29-2.png)<!-- -->
+![](simAlleleAge_files/figure-gfm/unnamed-chunk-30-2.png)<!-- -->
