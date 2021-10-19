@@ -476,9 +476,10 @@ abline(0,1,col='red',lty=2)
 
 
 ```{r}
-plot(sort(newfinalXl[newfinalXl$gamma==-0.2154435,1]), sort(finalXl[finalXl$gamma==gamma[17],1]), col='grey', main=paste0("Xl, gamma=",gamma[17]), ylab="backward approx", xlab="FIT sims")
-
-plot(sort(newfinalXl[newfinalXl$gamma==-0.2154435,3]), sort(finalXl[finalXl$gamma==gamma[17],3]), col='grey', main=paste0("al, gamma=",gamma[17]), ylab="backward approx", xlab="FIT sims")
+plot(sort(newfinalXl[newfinalXl$gamma==-100.0,1]), sort(finalXl[finalXl$gamma==gamma[1],1]), col='grey', main=paste0("Xl, gamma=",gamma[1]), ylab="backward approx", xlab="FIT sims")
+abline(0,1,col='red',lty=2)
+plot(sort(newfinalXl[newfinalXl$gamma==-100.0,3]), sort(finalXl[finalXl$gamma==gamma[1],3]), col='grey', main=paste0("al, gamma=",gamma[1]), ylab="backward approx", xlab="FIT sims")
+abline(0,1,col='red',lty=2)
 ```
 
 ```{r}

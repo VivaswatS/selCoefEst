@@ -79,7 +79,7 @@ system.time(finalXl<-estimXl(Xl,gamma,ndraws=1000))
 ```
 
     ##    user  system elapsed 
-    ##   1.138   0.749   3.473
+    ##   1.098   0.648   1.793
 
 Now, I have to add an extra column indicating the \(\gamma\) value for
 each row (i.e., frequency).
@@ -346,7 +346,7 @@ abline(0,1,col='red',lty=2)
 ![](simAlleleAge_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
 ``` r
-plot(log(finalXl[,4]),log(all.age),pch=20,col='grey40',xlab='Expected',ylab='Single draw')
+plot(log(finalXl[,4]),log(finalXl[,3]),pch=20,col='grey40',xlab='Expected',ylab='Single draw')
 abline(0,1,col='red',lty=2)
 ```
 
