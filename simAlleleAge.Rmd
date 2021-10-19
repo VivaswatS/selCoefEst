@@ -279,11 +279,11 @@ Below I plot the mean of the simulations versus the expected allele ages from th
 ```{r}
 rbPal <- colorRampPalette(c('grey','black'))
 par(mfrow=c(1,2))
-plot(log(finalXl[,4]),log(mean.all.age),pch=20,xlab="Expected",ylab="Mean of simulated",main="Allele age",col=rbPal(10)[as.numeric(cut(abs(finalXl[,2]),breaks = 20))])
+plot(log(finalXl[,4]),log(mean.all.age),pch=20,xlab="Expected",ylab="Mean of simulated",main="Allele age",col=rbPal(10)[as.numeric(cut(abs(finalXl[,1]),breaks = 20))])
 abline(0,1,col='red',lty=2)
 plot(finalXl[,4],mean.all.age,pch=20,xlab="Expected",ylab="Mean of simulated",main="Allele age",col='grey40')
 abline(0,1,col='red',lty=2)
-plot(log(finalXl[,4]),log(all.age),pch=20,col='grey40',xlab='Expected',ylab='Single draw')
+plot(log(finalXl[,4]),log(finalXl[,3]),pch=20,col='grey40',xlab='Expected',ylab='Single draw')
 abline(0,1,col='red',lty=2)
 ```
 

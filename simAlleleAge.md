@@ -337,7 +337,7 @@ from theory (points colored based on frequency:
 ``` r
 rbPal <- colorRampPalette(c('grey','black'))
 par(mfrow=c(1,2))
-plot(log(finalXl[,4]),log(mean.all.age),pch=20,xlab="Expected",ylab="Mean of simulated",main="Allele age",col=rbPal(10)[as.numeric(cut(abs(finalXl[,2]),breaks = 20))])
+plot(log(finalXl[,4]),log(mean.all.age),pch=20,xlab="Expected",ylab="Mean of simulated",main="Allele age",col=rbPal(10)[as.numeric(cut(abs(finalXl[,1]),breaks = 20))])
 abline(0,1,col='red',lty=2)
 plot(finalXl[,4],mean.all.age,pch=20,xlab="Expected",ylab="Mean of simulated",main="Allele age",col='grey40')
 abline(0,1,col='red',lty=2)
