@@ -139,9 +139,10 @@ NumericVector estimXlcpp(NumericVector Xl, NumericVector gamma, int ndraws){
 Here, I will use the $X_0$ as the starting frequency and run WF sims until it reaches a frequency of $<1/2N$ -- record this generation as the allele age. This formula is similar to equations found in Ewens 2007 for conditional processes in diffusion theory conditional on fixation (here, we condition on loss). 
 
 $$
-X_{t+1} | X_t, \gamma \sim N(\mu_s, V_s) \\
+X_{t+1} | X_t, \gamma \sim N(\mu_s \Delta t, V_s \Delta t) \\
+\Delta t = \frac{1}{2N} \\
 [[\mu* = -\frac{1}{2}sx(1-x)\coth(\frac{s}{2}(1-x))]]\\
-\mu_s = X_t - \frac{\gamma X_t (1-X_t)}{4N \tanh (\frac{\gamma}{4N}(1-X_t))} \\
+\mu_s = X_t - \frac{\gamma X_t (1-X_t)}{2\tanh (\frac{\gamma}{2}(1-X_t))} \\
 V_s = X_t(1-X_t)
 $$
 
@@ -178,7 +179,7 @@ int alleleAgecpp(float X0, float gamma, int N){
     while(Xt > 0.5/N){
         gen++;
         
-        mu = Xt - 0.25*gamma*Xt*(1-Xt)/tanh(0.25*gamma*(1-Xt))/N;
+        mu = Xt - 0.25*gamma*Xt*(1-Xt)/tanh(0.5*gamma*(1-Xt))/N;
         Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
     }  
     
@@ -211,13 +212,12 @@ sims.all.age<-apply(finalXl, 1, function(x) replicate(200, alleleAgecpp(x[1], x[
 Plotting a few example ECDFs and writing into a file: 
 
 ```{r}
-par(mfrow=c(2,1))
 plot(ecdf(sims.all.age[,123]), col="grey40")
 text(max(sims.all.age[,123]),0.1, labels=paste0("Xl=",finalXl[123,1],"\ngamma=",finalXl[123,2]))
 
-# plot(ecdf(sims.all.age[,45678]), col="grey40")
-# text(max(sims.all.age[,45678]),0.1, labels=paste0("Xl=",finalXl[45678,1],"\ngamma=",finalXl[45678,2]))
-# 
+plot(ecdf(sims.all.age[,3456]), col="grey40")
+text(max(sims.all.age[,3456]),0.1,labels=paste0("Xl=",finalXl[3456,1],"\ngamma=",finalXl[3456,2]))
+
 write.matrix(sims.all.age,file=paste0("traindata/sims-",Sys.Date(),".csv"),sep=",")
 ```
 
@@ -269,7 +269,7 @@ exp.al<-function(p, gamma, N){
 }
 
 finalXl<-cbind(finalXl, apply(finalXl, 1, function(x){exp.al(x[1], x[2], N)}))
-finalXl[,4]<-apply(finalXl, 1, function(x){exp.al(x[1], x[2], N)})
+#finalXl[,4]<-apply(finalXl, 1, function(x){exp.al(x[1], x[2], N)})
 colnames(finalXl)[4]<-"exp.al"
 finalXl[,4]<-finalXl[,4]*2*N
 ```
@@ -279,7 +279,7 @@ Below I plot the mean of the simulations versus the expected allele ages from th
 ```{r}
 rbPal <- colorRampPalette(c('grey','black'))
 par(mfrow=c(1,2))
-plot(log(finalXl[,4]),log(mean.all.age),pch=20,xlab="Expected",ylab="Mean of simulated",main="Allele age",col=rbPal(10)[as.numeric(cut(abs(finalXl[,1]),breaks = 20))])
+plot(log(finalXl[,4]),log(mean.all.age),pch=20,xlab="Expected",ylab="Mean of simulated",main="Log Allele age",col=rbPal(10)[as.numeric(cut(abs(finalXl[,1]),breaks = 20))])
 abline(0,1,col='red',lty=2)
 plot(finalXl[,4],mean.all.age,pch=20,xlab="Expected",ylab="Mean of simulated",main="Allele age",col='grey40')
 abline(0,1,col='red',lty=2)
@@ -446,12 +446,27 @@ Writing data out into a text file:
 write.matrix(final.data,file=paste0("traindata/trip-",Sys.Date(),".csv"),sep=",")
 ```
 
-### Comparing between the two methods for simulation
-
 Reading in simulated data from before:
 ```{r}
 newfinalXl<-read.csv("traindata/trip-2021-08-25.csv")
 ```
+
+## Comparing between FIT sims and expected values 
+
+```{r}
+newfinalXl<-cbind(newfinalXl, apply(newfinalXl, 1, function(x){exp.al(x[1], x[2], N)}))
+colnames(newfinalXl)[4]<-"exp.al"
+newfinalXl[,4]<-newfinalXl[,4]/2/N
+```
+
+```{r}
+plot(log(newfinalXl[,3]),log(newfinalXl[,4]),pch=20,col='grey',main="Log allele ages",xlab='Simulated',ylab='Expected')
+abline(0,1,col='red')
+plot(newfinalXl[,3],newfinalXl[,4],pch=20,col='grey',main="Allele ages",xlab='Simulated',ylab='Expected')
+abline(0,1,col='red')
+```
+
+### Comparing between the two methods for simulation
 
 Method: For a given freq in the FIT sims find a freq(s) that is close to the given and compare the allele ages between the two. Do this separately for each selection coefficient $\gamma$. 
 
@@ -468,17 +483,11 @@ plot(finalXl[finalXl$gamma==gamma[7],3],newfinalXl[didx,3],pch=20,xlab='Backward
 
 ```{r}
 finalXl<-as.data.frame(finalXl)
-plot(sort(newfinalXl[newfinalXl$gamma==-10,1]), sort(finalXl[finalXl$gamma==gamma[7],1]), col='grey', main=paste0("Xl, gamma=",gamma[7]), ylab="backward approx", xlab="FIT sims")
+plot(sort(newfinalXl[newfinalXl$gamma==-10,3]), sort(finalXl[finalXl["gamma"]==gamma[7],3]), col='grey', main=paste0("Estimated ages, gamma=",gamma[7]), ylab="backward approx", xlab="FIT sims")
 abline(0,1,col='red',lty=2)
-plot(sort(newfinalXl[newfinalXl$gamma==-10,3]), sort(finalXl[finalXl["gamma"]==gamma[7],3]), col='grey', main=paste0("al, gamma=",gamma[7]), ylab="backward approx", xlab="FIT sims")
+plot(sort(newfinalXl[newfinalXl$gamma==-1.0,3]), sort(finalXl[finalXl$gamma==gamma[13],3]), col='grey', main=paste0("gamma=",gamma[13]), ylab="backward approx", xlab="FIT sims")
 abline(0,1,col='red',lty=2)
-```
-
-
-```{r}
-plot(sort(newfinalXl[newfinalXl$gamma==-100.0,1]), sort(finalXl[finalXl$gamma==gamma[1],1]), col='grey', main=paste0("Xl, gamma=",gamma[1]), ylab="backward approx", xlab="FIT sims")
-abline(0,1,col='red',lty=2)
-plot(sort(newfinalXl[newfinalXl$gamma==-100.0,3]), sort(finalXl[finalXl$gamma==gamma[1],3]), col='grey', main=paste0("al, gamma=",gamma[1]), ylab="backward approx", xlab="FIT sims")
+plot(sort(newfinalXl[newfinalXl$gamma==-100.0,3]), sort(finalXl[finalXl$gamma==gamma[1],3]), col='grey', main=paste0("gamma=",gamma[1]), ylab="backward approx", xlab="FIT sims")
 abline(0,1,col='red',lty=2)
 ```
 

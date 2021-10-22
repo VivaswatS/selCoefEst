@@ -238,22 +238,27 @@ sims.all.age<-apply(finalXl, 1, function(x) replicate(200, alleleAgecpp(x[1], x[
 Plotting a few example ECDFs and writing into a file:
 
 ``` r
-par(mfrow=c(2,1))
 plot(ecdf(sims.all.age[,123]), col="grey40")
 text(max(sims.all.age[,123]),0.1, labels=paste0("Xl=",finalXl[123,1],"\ngamma=",finalXl[123,2]))
-
-# plot(ecdf(sims.all.age[,45678]), col="grey40")
-# text(max(sims.all.age[,45678]),0.1, labels=paste0("Xl=",finalXl[45678,1],"\ngamma=",finalXl[45678,2]))
-# 
-write.matrix(sims.all.age,file=paste0("traindata/sims-",Sys.Date(),".csv"),sep=",")
 ```
 
 ![](simAlleleAge_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
 
+``` r
+plot(ecdf(sims.all.age[,456]), col="grey40")
+text(max(sims.all.age[,456]),0.1,labels=paste0("Xl=",finalXl[456,1],"\ngamma=",finalXl[456,2]))
+```
+
+![](simAlleleAge_files/figure-gfm/unnamed-chunk-12-2.png)<!-- -->
+
+``` r
+#write.matrix(sims.all.age,file=paste0("traindata/sims-",Sys.Date(),".csv"),sep=",")
+```
+
 Writing into a file as training data:
 
 ``` r
-write.matrix(finalXl,file=paste0("traindata/trip-",Sys.Date(),".csv"),sep=",")
+#write.matrix(finalXl,file=paste0("traindata/trip-",Sys.Date(),".csv"),sep=",")
 ```
 
 ## Comparison between theory and empirical draws
@@ -546,39 +551,34 @@ plot(finalXl[finalXl$gamma==gamma[7],3],newfinalXl[didx,3],pch=20,xlab='Backward
 
 ``` r
 finalXl<-as.data.frame(finalXl)
-plot(sort(newfinalXl[newfinalXl$gamma==-10,1]), sort(finalXl[finalXl$gamma==gamma[7],1]), col='grey', main=paste0("Xl, gamma=",gamma[7]), ylab="backward approx", xlab="FIT sims")
+plot(sort(newfinalXl[newfinalXl$gamma==-10,3]), sort(finalXl[finalXl["gamma"]==gamma[7],3]), col='grey', main=paste0("Estimated ages, gamma=",gamma[7]), ylab="backward approx", xlab="FIT sims")
 abline(0,1,col='red',lty=2)
 ```
 
 ![](simAlleleAge_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
 
 ``` r
-plot(sort(newfinalXl[newfinalXl$gamma==-10,3]), sort(finalXl[finalXl["gamma"]==gamma[7],3]), col='grey', main=paste0("al, gamma=",gamma[7]), ylab="backward approx", xlab="FIT sims")
+plot(sort(newfinalXl[newfinalXl$gamma==-1.0,3]), sort(finalXl[finalXl$gamma==gamma[13],3]), col='grey', main=paste0("gamma=",gamma[13]), ylab="backward approx", xlab="FIT sims")
 abline(0,1,col='red',lty=2)
 ```
 
 ![](simAlleleAge_files/figure-gfm/unnamed-chunk-28-2.png)<!-- -->
 
 ``` r
-plot(sort(newfinalXl[newfinalXl$gamma==-0.2154435,1]), sort(finalXl[finalXl$gamma==gamma[17],1]), col='grey', main=paste0("Xl, gamma=",gamma[17]), ylab="backward approx", xlab="FIT sims")
+plot(sort(newfinalXl[newfinalXl$gamma==-100.0,3]), sort(finalXl[finalXl$gamma==gamma[1],3]), col='grey', main=paste0("gamma=",gamma[1]), ylab="backward approx", xlab="FIT sims")
+abline(0,1,col='red',lty=2)
 ```
 
-![](simAlleleAge_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
-
-``` r
-plot(sort(newfinalXl[newfinalXl$gamma==-0.2154435,3]), sort(finalXl[finalXl$gamma==gamma[17],3]), col='grey', main=paste0("al, gamma=",gamma[17]), ylab="backward approx", xlab="FIT sims")
-```
-
-![](simAlleleAge_files/figure-gfm/unnamed-chunk-29-2.png)<!-- -->
+![](simAlleleAge_files/figure-gfm/unnamed-chunk-28-3.png)<!-- -->
 
 ``` r
 hist(finalXl[finalXl$Xl>0.1&finalXl$Xl<0.2&finalXl$gamma==gamma[7],3],main='bakward approx. age')
 ```
 
-![](simAlleleAge_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
+![](simAlleleAge_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
 
 ``` r
 hist(newfinalXl[newfinalXl$Xl>0.1&newfinalXl$Xl<0.2&newfinalXl$gamma==-10,3],col='grey',main='FIT sim. age')
 ```
 
-![](simAlleleAge_files/figure-gfm/unnamed-chunk-30-2.png)<!-- -->
+![](simAlleleAge_files/figure-gfm/unnamed-chunk-29-2.png)<!-- -->
