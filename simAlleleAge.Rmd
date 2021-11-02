@@ -16,6 +16,10 @@ library(Rcpp)
 library(expint)
 library(MASS)
 library(gplots)
+library(ggplot2)
+library(lme4)
+library(brms)
+library(brmstools)
 ```
 
 *All calculations below are per-site/locus, $l$. Will port this into a global meta-function for ease of use later.* 
@@ -494,5 +498,96 @@ abline(0,1,col='red',lty=2)
 ```{r}
 hist(finalXl[finalXl$Xl>0.1&finalXl$Xl<0.2&finalXl$gamma==gamma[7],3],main='bakward approx. age')
 hist(newfinalXl[newfinalXl$Xl>0.1&newfinalXl$Xl<0.2&newfinalXl$gamma==-10,3],col='grey',main='FIT sim. age')
+```
+
+## Linear mixed models 
+
+There seems to be a pretty linear relationship between log(X) and log(a), contingent on $\gamma$ - so a linear mixed model with random intercepts and random slopes(?)
+
+### Exploratory data analysis
+```{r}
+ggplot(finalXl[1:4000,], aes(x=log(Xl),y=log(al))) + 
+   facet_wrap(~gamma,scales="fixed") + 
+   geom_point() + geom_smooth(method="glm") +
+   xlab('log(Xl)') + ylab('log(al)') + theme_bw()
+```
+
+### Constructing a brms model 
+
+#### 1. only fixed effects...
+
+Do one model with gamma and another with no gamma (seems like gamma only predicts how far it goes to the right...ugh sticky sitch)
+
+```{r}
+f_fe<-bf(al ~ gamma + log(Xl)) 
+#get_prior(f_ri,d,family='gaussian')
+my_priors<-c(
+            # between-subject SD #
+            set_prior("normal(0, 2)", class = "sd"),
+            # overall (population) mean (intercept) #
+            set_prior("normal(4, 1)", class = "Intercept"),
+            # subject-avgd days effect #
+            set_prior("normal(0, 1)", class = "b"),
+            # within-subject (error) SD #
+            set_prior("normal(0, 4)", class = "sigma"))  
+m_ri<-brm(formula=f_ri, data=finalXl, family=gaussian(link='log'), 
+          prior = my_priors, seed=10111985,      
+          control=list(adapt_delta = 0.8, max_treedepth=10), 
+          warmup=1000, iter=3000, thin=5, chains=3, cores=3)   
+m_ri
+coef(m_ri)
+```
+
+visualizing the results from the above model:
+
+```{r}
+panels(m_ri,xvar="log(Xl)", ribbon_fill='pink',line_col='red') + theme_bw()
+
+# posterior predictive check #
+#*overall*#
+pp_check(m_ri,ndraws = 100) + 
+        xlab('log age') + theme_bw() 
+#*subject-specific*#
+pp_check(m_ri,ndraws = 100,type="stat_grouped",
+         group = "gamma",stat="mean") + theme_bw()
+```
+
+
+#### 2. random intercept model 
+
+should work just as well as random slopes - cos slopes look the same
+
+```{r}
+f_ri<-bf(al ~ (1|gamma) + log(Xl)) 
+#get_prior(f_ri,d,family='gaussian')
+my_priors<-c(
+            # between-subject SD #
+            set_prior("normal(0, 2)", class = "sd"),
+            # overall (population) mean (intercept) #
+            set_prior("normal(4, 1)", class = "Intercept"),
+            # subject-avgd days effect #
+            set_prior("normal(0, 1)", class = "b"),
+            # within-subject (error) SD #
+            set_prior("normal(0, 4)", class = "sigma"))  
+m_ri<-brm(formula=f_ri, data=finalXl, family=gaussian(link='log'), 
+          prior = my_priors, seed=10111985,      
+          control=list(adapt_delta = 0.8, max_treedepth=10), 
+          warmup=1000, iter=3000, thin=5, chains=3, cores=3)   
+m_ri
+coef(m_ri)
+```
+
+visualizing the results from the above model:
+
+```{r}
+panels(m_ri,xvar="log(Xl)", ribbon_fill='pink',line_col='red') + theme_bw()
+
+# posterior predictive check #
+#*overall*#
+pp_check(m_ri,ndraws = 100) + 
+        xlab('log age') + theme_bw() 
+#*subject-specific*#
+pp_check(m_ri,ndraws = 100,type="stat_grouped",
+         group = "gamma",stat="mean") + theme_bw()
 ```
 
