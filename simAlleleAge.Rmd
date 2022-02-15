@@ -6,7 +6,7 @@ pandoc_args: "--webtex"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Imports
@@ -17,9 +17,9 @@ library(expint)
 library(MASS)
 library(gplots)
 library(ggplot2)
-library(lme4)
-library(brms)
-library(brmstools)
+# library(lme4)
+# library(brms)
+# library(brmstools)
 ```
 
 *All calculations below are per-site/locus, $l$. Will port this into a global meta-function for ease of use later.* 
@@ -58,10 +58,11 @@ estimXl<-function(Xl, gamma, ndraws){
         lbscal<-expint_Ei(2*gamma[n]*(Xl[1]-1)) - exp(-2*gamma[n])*expint_Ei(2*gamma[n]*Xl[1]) - log(1-Xl[1]) + log(Xl[1])
         scal.fact<-(expint_Ei(2*gamma[n]*(Xl[length(Xl)]-1)) - exp(-2*gamma[n])*expint_Ei(2*gamma[n]*Xl[length(Xl)]) - log(1-Xl[length(Xl)]) + log(Xl[length(Xl)])) - lbscal
         
-        pXl<-(expint_Ei(2*gamma[n]*(Xl-1)) - exp(-2*gamma[n])*expint_Ei(2*gamma[n]*Xl) - log(1-Xl) + log(Xl) - lbscal)/scal.fact # exp(2*gamma[n])/(exp(2*gamma[n])-1) gets cancelled out from num and den...
+        # CDF required for inverse transform sampling
+        FXl<-(expint_Ei(2*gamma[n]*(Xl-1)) - exp(-2*gamma[n])*expint_Ei(2*gamma[n]*Xl) - log(1-Xl) + log(Xl) - lbscal)/scal.fact # exp(2*gamma[n])/(exp(2*gamma[n])-1) gets cancelled out from num and den...
         
         u<-runif(ndraws, 0, 1)
-        finalXl[((n-1)*ndraws+1):(n*ndraws)]<-Xl[sapply(u,function(x){which.min(abs(pXl-x))})]
+        finalXl[((n-1)*ndraws+1):(n*ndraws)]<-Xl[sapply(u,function(x){which.min(abs(FXl-x))})]
     }
     return(finalXl)
 }
@@ -180,12 +181,18 @@ int alleleAgecpp(float X0, float gamma, int N){
     double Xt = X0;
     double mu = 0.0;
     
-    while(Xt > 0.5/N){
+    do{
         gen++;
         
         mu = Xt - 0.25*gamma*Xt*(1-Xt)/tanh(0.5*gamma*(1-Xt))/N;
         Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
-    }  
+    }while(gen > 1 && Xt > 0.5/N);
+    /*while(Xt > 0.5/N){
+        gen++;
+        
+        mu = Xt - 0.25*gamma*Xt*(1-Xt)/tanh(0.5*gamma*(1-Xt))/N;
+        Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
+    }  */
     
     return gen;
 }
