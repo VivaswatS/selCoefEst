@@ -29,9 +29,9 @@ library(ggplot2)
 Here, I pick the population scaled selection coefficient $\gamma = 2Ns \in [-100, -0.01]$ to then use for simulating allele frequency $X$. Assumes a selection parameterization of $1, 1+\frac{1}{2}s, 1+s$. 
 
 ```{r}
-N<-2500 # inds
+N<-10000 # inds
 # initial: need a total of 5000 training data sets: 50 selection values on either side + 0 with 100 instances of allele frequencies
-L<-200 
+# L<-200 
 
 # just pick a grid of values here, say, ~50
 gamma<-c(-exp(log(10)*seq(2, -2, length.out=25)))#,exp(log(10)*seq(-2, 2, length.out=25)))
@@ -52,17 +52,21 @@ The following code chunk needs to be repeated for every value of $\gamma$.
 
 ```{r, cache=TRUE}
 Xl<-(1:(4*N-1))/(4*N)
-estimXl<-function(Xl, gamma, ndraws){
+estimXl<-function(Xl, gamma, ndraws, cutoff=20, n=2000){
     finalXl<-rep(0,length(gamma)*ndraws)
-    for(n in 1:length(gamma)){
-        lbscal<-expint_Ei(2*gamma[n]*(Xl[1]-1)) - exp(-2*gamma[n])*expint_Ei(2*gamma[n]*Xl[1]) - log(1-Xl[1]) + log(Xl[1])
-        scal.fact<-(expint_Ei(2*gamma[n]*(Xl[length(Xl)]-1)) - exp(-2*gamma[n])*expint_Ei(2*gamma[n]*Xl[length(Xl)]) - log(1-Xl[length(Xl)]) + log(Xl[length(Xl)])) - lbscal
+    for(g in 1:length(gamma)){
+        lbscal<-expint_Ei(2*gamma[g]*(Xl[1]-1)) - exp(-2*gamma[g])*expint_Ei(2*gamma[g]*Xl[1]) - log(1-Xl[1]) + log(Xl[1])
+        scal.fact<-(expint_Ei(2*gamma[g]*(Xl[length(Xl)]-1)) - exp(-2*gamma[g])*expint_Ei(2*gamma[g]*Xl[length(Xl)]) - log(1-Xl[length(Xl)]) + log(Xl[length(Xl)])) - lbscal
         
         # CDF required for inverse transform sampling
-        FXl<-(expint_Ei(2*gamma[n]*(Xl-1)) - exp(-2*gamma[n])*expint_Ei(2*gamma[n]*Xl) - log(1-Xl) + log(Xl) - lbscal)/scal.fact # exp(2*gamma[n])/(exp(2*gamma[n])-1) gets cancelled out from num and den...
+        FXl<-(expint_Ei(2*gamma[g]*(Xl-1)) - exp(-2*gamma[g])*expint_Ei(2*gamma[g]*Xl) - log(1-Xl) + log(Xl) - lbscal)/scal.fact # exp(2*gamma[g])/(exp(2*gamma[g])-1) gets cancelled out from num and den...
         
-        u<-runif(ndraws, 0, 1)
-        finalXl[((n-1)*ndraws+1):(n*ndraws)]<-Xl[sapply(u,function(x){which.min(abs(FXl-x))})]
+        # place cutoff here:
+        ui<-seq(0,1,0.001)
+        # basically, asking to only draw random values from when Xl>0.01 & 1
+        u<-runif(ndraws,ui[which.min(abs(cutoff/n-Xl[sapply(ui,function(x){which.min(abs(FXl-x))})]))+1],1)
+        
+        finalXl[((g-1)*ndraws+1):(g*ndraws)]<-Xl[sapply(u,function(x){which.min(abs(FXl-x))})]
     }
     return(finalXl)
 }
@@ -181,18 +185,12 @@ int alleleAgecpp(float X0, float gamma, int N){
     double Xt = X0;
     double mu = 0.0;
     
-    do{
+    while(Xt > 0.5/N){
         gen++;
         
         mu = Xt - 0.25*gamma*Xt*(1-Xt)/tanh(0.5*gamma*(1-Xt))/N;
         Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
-    }while(gen > 1 && Xt > 0.5/N);
-    /*while(Xt > 0.5/N){
-        gen++;
-        
-        mu = Xt - 0.25*gamma*Xt*(1-Xt)/tanh(0.5*gamma*(1-Xt))/N;
-        Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
-    }  */
+    }  
     
     return gen;
 }
