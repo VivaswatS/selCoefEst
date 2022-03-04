@@ -34,7 +34,7 @@ N<-10000 # inds
 # L<-200 
 
 # just pick a grid of values here, say, ~50
-gamma<-c(-exp(log(10)*seq(2, -2, length.out=25)))#,exp(log(10)*seq(-2, 2, length.out=25)))
+gamma<-c(-exp(log(10)*seq(2, 0, length.out=20)))#,exp(log(10)*seq(-2, 2, length.out=25)))
 ```
 
 ## Simulating $X_l$
@@ -71,7 +71,7 @@ estimXl<-function(Xl, gamma, ndraws, cutoff=20, n=2000){
     return(finalXl)
 }
 
-system.time(finalXl<-estimXl(Xl,gamma,ndraws=1000))
+system.time(finalXl<-estimXl(Xl,gamma,ndraws=1000,cutoff=10))
 ```
 
 Now, I have to add an extra column indicating the $\gamma$ value for each row (i.e., frequency). 
@@ -202,7 +202,7 @@ Time to farm out the above function to each row in the previous data frame:
 all.age<-apply(finalXl, 1, function(x) alleleAgecpp(x[1], x[2], N))
 finalXl<-cbind(finalXl, all.age)
 colnames(finalXl)[3]<-"al"
-finalXl[all.age==0,3]<-finalXl[all.age==0,3]+1
+# finalXl[all.age==0,3]<-finalXl[all.age==0,3]+1
 ```
 
 Below code will compute the empirical expectation of the allele age over multiple (say, 50) realizations of the FIT simulations. 
