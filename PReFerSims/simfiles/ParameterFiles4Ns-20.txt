@@ -1,0 +1,8 @@
+MutationRate: 200
+DFEType: point
+DFEPointSelectionCoefficient: 0.00125
+DemographicHistory: simfiles/Bottleneck.txt 
+n: 1000
+PrintSegSiteInfo: 1
+LastGenerationAFSamplingValue: 1
+FilePrefix: outfiles/Bottleneck
