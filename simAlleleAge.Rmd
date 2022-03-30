@@ -62,22 +62,24 @@ estimXl<-function(Xl, gamma, ndraws, cutoff=20, n=2000){
         FXl<-(expint_Ei(2*gamma[g]*(Xl-1)) - exp(-2*gamma[g])*expint_Ei(2*gamma[g]*Xl) - log(1-Xl) + log(Xl) - lbscal)/scal.fact # exp(2*gamma[g])/(exp(2*gamma[g])-1) gets cancelled out from num and den...
         
         # place cutoff here:
-        ui<-seq(0,1,0.001)
+        # ui<-seq(0,1,0.001)
         # basically, asking to only draw random values from when Xl>0.01 & 1
-        u<-runif(ndraws,ui[which.min(abs(cutoff/n-Xl[sapply(ui,function(x){which.min(abs(FXl-x))})]))+1],1)
+        # u<-runif(ndraws,ui[which.min(abs(cutoff/n-Xl[sapply(ui,function(x){which.min(abs(FXl-x))})]))+1],1)
+        # sampling w no cutoff:
+        u<-runif(ndraws, 0, 1)
         
         finalXl[((g-1)*ndraws+1):(g*ndraws)]<-Xl[sapply(u,function(x){which.min(abs(FXl-x))})]
     }
     return(finalXl)
 }
 
-system.time(finalXl<-estimXl(Xl,gamma,ndraws=1000,cutoff=10))
+system.time(finalXl<-estimXl(Xl,gamma,ndraws=10000,cutoff=10))
 ```
 
 Now, I have to add an extra column indicating the $\gamma$ value for each row (i.e., frequency). 
 
 ```{r, cache=TRUE}
-finalXl<-cbind(finalXl, rep(gamma,1, each=1000))
+finalXl<-cbind(finalXl, rep(gamma,1, each=10000))
 colnames(finalXl)<-c("Xl","gamma")
 ```
 

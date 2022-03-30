@@ -1,0 +1,10 @@
+MutationRate: 500
+DFEType: gamma
+DFEParameterOne: 0.184
+DFEParameterTwo: 319.8626
+DFEParameterThree: 1000
+DemographicHistory: simfiles/ConstantSize.txt 
+n: 1000
+PrintSegSiteInfo: 1
+LastGenerationAFSamplingValue: 1
+FilePrefix: outfiles/ConstantSizeBoyko
