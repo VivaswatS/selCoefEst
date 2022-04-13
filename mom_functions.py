@@ -17,6 +17,8 @@ import itertools as it
 from copy import deepcopy
 import matplotlib.colors as colors
 import seaborn
+import warnings
+warnings.filterwarnings('error')
 
 # rng setup
 rng = default_rng(100496)
@@ -221,10 +223,6 @@ def run_mom_iterate_constant(a, n, s, N, mu, misc):
 
     return n*mu*mom[:-1,:]           
 
-
-# In[ ]:
-
-
 ## function where each generation was integrated to separately
 def run_mom_integrate(a, n, s, N, mu, misc):
     fsmat = np.zeros((a,n+1))
@@ -252,10 +250,10 @@ def run_mom_integrate2(a, n, s, N, mu, misc):
 ## function to obtain the log P(X,|gamma)
 def get_lp_xl(p_xa_s, g, sXlred, n=2000, cutoff=20):
     """function to compute L(gamma|Xl), where gamma is a range of values and Xl is a given set of freqs"""
-    res = np.empty(np.sum((sXlred>cutoff) & (sXlred<n-cutoff+1))) #np.empty(len(Xlred))
+    res = np.empty(np.sum((sXlred>=cutoff) & (sXlred<=n-cutoff+1))) #np.empty(len(Xlred))
 
     # just performing a search in a look-up table
-    for idx, i in enumerate(np.where((sXlred>cutoff) & (sXlred<n-cutoff+1))[0]):
+    for idx, i in enumerate(np.where((sXlred>=cutoff) & (sXlred<=n-cutoff+1))[0]):
         res[idx] = p_xa_s[g][sXlred[i]]
     
     return np.log(res)
@@ -280,23 +278,25 @@ def get_lp_xl2(g, sXlred, n=2000, cutoff=20):
 def get_lp_alxl(up_xa_s, g, sXlred, alred, n=2000, cutoff=20):
     # Xsamp = np.arange(1,n)/n
     # sXlred = np.around(Xlred*n).astype(int) # rng.binomial(n, Xlred, len(Xlred))
-    res = np.empty(np.sum((sXlred>cutoff) & (sXlred<n-cutoff+1)))
-    for idx, i in enumerate(np.where((sXlred>cutoff) & (sXlred<n-cutoff+1))[0]):
+    res = np.empty(np.sum((sXlred>=cutoff) & (sXlred<=n-cutoff+1)))
+    for idx, i in enumerate(np.where((sXlred>=cutoff) & (sXlred<=n-cutoff+1))[0]):
         # if too many gens, then pass in a very low number (like -400.)
         # res[i] = np.log(p_xa_s[g][-int(alred[i]),np.argmin(np.abs(Xlred[i]-Xsamp))+1]) if (int(alred[i]<p_xa_s[g].shape[0])) else -400. 
-        
-        res[idx] = np.log(up_xa_s[g][-int(alred[i]),sXlred[i]]) if (int(alred[i])<up_xa_s[g].shape[0]) else np.median(np.log(up_xa_s[g][0,:]))
+        try:
+            res[idx] = np.log(up_xa_s[g][-int(alred[i]),sXlred[i]]) if (int(alred[i])<up_xa_s[g].shape[0]) else np.median(np.log(up_xa_s[g][0,:]))
+        except RuntimeWarning:
+            print(g, sXlred[i], alred[i])
         # if np.isinf(res[idx]):
         #     print(i, Xlred[i], alred[i])
 
     return res
 
-def get_info_content(newdat, num_samps=800, num_sims=16, cutoff=10):
+def get_info_content(p_xa_s, up_xa_s, newdat, num_samps=800, num_sims=16, cutoff=10):
     ci_freq, ci_age = np.zeros(num_sims), np.zeros(num_sims)
     for n in range(num_sims):
         newnewdat = newdat[rng.choice(newdat.shape[0], num_samps, replace=False),:]
-        sin_onlyfreq = [np.sum(get_lp_xl(g1, newnewdat[:,5], cutoff=cutoff)) for g1 in gamma]
-        sin_onlyage = [np.sum(get_lp_alxl(g1, newnewdat[:,5], newnewdat[:,2], cutoff=cutoff)) for g1 in gamma]
+        sin_onlyfreq = [np.sum(get_lp_xl(p_xa_s, g1, newnewdat[:,5], cutoff=cutoff)) for g1 in gamma]
+        sin_onlyage = [np.sum(get_lp_alxl(up_xa_s, g1, newnewdat[:,5], newnewdat[:,2], cutoff=cutoff)) for g1 in gamma]
 
         ci_freq[n] = np.abs(get_bfq(sin_onlyfreq-np.max(sin_onlyfreq), gamma)[0])
         ci_age[n] = np.abs(get_bfq(sin_onlyage-np.max(sin_onlyage), gamma)[0])
@@ -318,6 +318,25 @@ def get_conf_int(loglik, thresh=2):
         return [(np.max(loglik)-thresh-loglik[np.argmax(loglik)+1])*(mle - lower_thresh)/(np.max(loglik) - loglik[np.argmax(loglik)+1])+lower_thresh, -thresh*(upper_thresh - mle)/(loglik[np.argmax(loglik)-1] - np.max(loglik))+mle,]
         # return [(np.max(loglik)-thresh-loglik[np.argmax(loglik)+1])/(np.max(loglik) - loglik[np.argmax(loglik)+1])/(mle - lower_thresh)+lower_thresh, -thresh/(loglik[np.argmax(loglik)-1] - np.max(loglik))/(upper_thresh - mle)+mle]
 
+def get_boot_ci(gamma, p_xa_s, up_xa_s, newdat, nsamps=1000, nboot=20, cutoff=2):
+    mle = np.zeros((nboot,2))
+    sin_onlyfreq, sin_onlyage = np.zeros(len(gamma)), np.zeros(len(gamma))
+    for i in range(nboot):
+        newdat = newdat[rng.choice(len(newdat),nsamps,replace=True)]
+        for ig, g in enumerate(gamma):
+            sin_onlyfreq[ig] = np.sum(get_lp_xl(p_xa_s, g, newdat[:,5], cutoff=cutoff))
+            sin_onlyage[ig] = np.sum(get_lp_alxl(up_xa_s, g, newdat[:,5], newdat[:,3], cutoff=cutoff))
+        
+        mle[i,0] = gamma[np.argmax(sin_onlyfreq)]
+        mle[i,1] = gamma[np.argmax(sin_onlyage)]
+
+    return mle            
+
+def get_ci(loglik, gamma, thresh=-1.96):
+    ## this function returns the y values for when loglik is -2 (max is 0)
+    ## loglik is asymptotically Normal so this is 95% CI
+    a, b, c = get_bfq(loglik-np.max(loglik), gamma)
+    return [-(-b-np.sqrt(b**2-4*a*(c-thresh)))*0.5/a,-(-b+np.sqrt(b**2-4*a*(c-thresh)))*0.5/a]
 
 def get_bfq(loglik, gamma):
     ## does not work for some reason—wasted multiple hours on it...
@@ -341,7 +360,7 @@ def resample_calculateprob_freq(newdat, gamma, num_sims=16, num_samps=500, thres
     sin_onlyfreq = np.empty(len(gamma))
     dub_onlyfreq = np.zeros((len(gamma),len(gamma)))
     for n in np.arange(num_sims):
-        newnewdat = newdat[np.random.choice(newdat.shape[0], num_samps, replace=False),:]
+        newnewdat = newdat[rng.choice(newdat.shape[0], num_samps, replace=False),:]
         for ig, g in enumerate(gamma):
             # sum log prob for each locus
             sin_onlyfreq[ig] = np.sum(get_lp_xl(g, newnewdat[:,5], cutoff=cutoff))
@@ -365,35 +384,6 @@ def resample_calculateprob_freq(newdat, gamma, num_sims=16, num_samps=500, thres
 # num_samps is number of rows to resample the big data from
 # gamma is np.array of values to calculate over
 # thresh is threshold to assign significance
-def resample_calculateprob_agefreq(newdat, gamma, num_sims=16, num_samps=500, thresh=0.05):
-    prob = 0.
-
-    sin_agefreq = np.empty(len(gamma))
-    
-    dub_agefreq = np.zeros((len(gamma),len(gamma)))
-    for n in np.arange(num_sims):
-        newnewdat = newdat[np.random.choice(newdat.shape[0], num_samps, replace=False),:]
-        for ig, g in enumerate(gamma):
-            # sum log prob for each locus
-            sin_agefreq[ig] = np.sum(get_lp_alxl(g, newnewdat[:,0], newnewdat[:,2], n=100) + get_lp_xl(g, newnewdat[:,0]))
-            for ig2, g2 in enumerate(gamma[0:(ig+1)]):
-                dub_agefreq[ig, ig2] = np.sum(np.log(0.5*np.exp(get_lp_alxl(g, newnewdat[:,5], newnewdat[:,2]) + get_lp_xl(g, newnewdat[:,5])) + 0.5*np.exp(get_lp_alxl(g2, newnewdat[:,5], newnewdat[:,2]) + get_lp_xl(g2, newnewdat[:,5]))))
-
-        estgagefreq = gamma[np.nanargmax(sin_agefreq)]        
-
-        estg1agefreq = gamma[np.unravel_index(np.nanargmax(dub_agefreq[~mask]), dub_agefreq.shape)[0]]
-        estg2agefreq = gamma[np.unravel_index(np.nanargmax(dub_agefreq[~mask]), dub_agefreq.shape)[1]]
-
-        lambagefreq = 2.*(dub_agefreq[gamma==estg1agefreq,gamma==estg2agefreq] - sin_agefreq[gamma==estgagefreq])
-
-        if(chi2.sf(lambagefreq, 1)<thresh):
-            prob += 1.
-
-    return prob/num_sims
-
-# num_samps is number of rows to resample the big data from
-# gamma is np.array of values to calculate over
-# thresh is threshold to assign significance
 def resample_calculateprob_age(newdat, gamma, num_sims=16, num_samps=500, thresh=0.05, cutoff=10):
     prob = 0.
 
@@ -401,7 +391,7 @@ def resample_calculateprob_age(newdat, gamma, num_sims=16, num_samps=500, thresh
     
     dub_onlyage = np.zeros((len(gamma),len(gamma)))
     for n in np.arange(num_sims):
-        newnewdat = newdat[np.random.choice(newdat.shape[0], num_samps, replace=False),:]
+        newnewdat = newdat[rng.choice(newdat.shape[0], num_samps, replace=False),:]
         for ig, g in enumerate(gamma):
             # sum log prob for each locus
             sin_onlyage[ig] = np.sum(get_lp_alxl(g, newnewdat[:,5], newnewdat[:,2], cutoff=cutoff))

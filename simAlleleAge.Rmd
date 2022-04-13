@@ -73,13 +73,13 @@ estimXl<-function(Xl, gamma, ndraws, cutoff=20, n=2000){
     return(finalXl)
 }
 
-system.time(finalXl<-estimXl(Xl,gamma,ndraws=10000,cutoff=10))
+system.time(finalXl<-estimXl(Xl,gamma,ndraws=5000,cutoff=10))
 ```
 
 Now, I have to add an extra column indicating the $\gamma$ value for each row (i.e., frequency). 
 
 ```{r, cache=TRUE}
-finalXl<-cbind(finalXl, rep(gamma,1, each=10000))
+finalXl<-cbind(finalXl, rep(gamma,1, each=5000))
 colnames(finalXl)<-c("Xl","gamma")
 ```
 
