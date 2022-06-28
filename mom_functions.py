@@ -168,8 +168,8 @@ def run_mom_iterate_changing(n, s, Nc, mu, misc):
     for i in range(len(changepoints)-1):
         D = 0.25/Nc[len(Nc)-changepoints[i]] * calcD(n+1)
 
-        slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - dt / 2.0 * (D + S))
-        Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + dt / 2.0 * (D + S)
+        slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - 0.5 * (D + S))
+        Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + 0.5 * (D + S)
 
         for gen in np.arange(changepoints[i+1],changepoints[i])[::-1]:
             momkp1 = slv(Q.dot(mom[gen+1,]))
@@ -177,7 +177,7 @@ def run_mom_iterate_changing(n, s, Nc, mu, misc):
 
             mom[gen,] = deepcopy(momkp1)
 
-    return n*mu*mom[:-1,:]           
+    return mom[:-1,:]           
 
 ## packaging into a function for easy manipulation - iteration implementation 
 # input: a (number of gens), n (number of samples), s, N (pop size)
@@ -221,7 +221,7 @@ def run_mom_iterate_constant(a, n, s, N, mu, misc):
 
         mom[gen,] = deepcopy(momkp1)
 
-    return n*mu*mom[:-1,:]           
+    return mom[:-1,:]           
 
 ## function where each generation was integrated to separately
 def run_mom_integrate(a, n, s, N, mu, misc):
@@ -345,7 +345,7 @@ def get_bfq(loglik, gamma):
     loglik = loglik[(np.argmax(loglik)-1):(np.argmax(loglik)+2)] if np.argmax(loglik)>0 else loglik[0:3]
 
     rhs = np.array([np.dot(igamma**2,loglik), np.dot(igamma,loglik), np.sum(loglik)])
-    lhs = np.matrix([[np.sum(igamma**4), np.sum(igamma**3), np.sum(igamma**2)],
+    lhs = np.array([[np.sum(igamma**4), np.sum(igamma**3), np.sum(igamma**2)],
     [np.sum(igamma**3), np.sum(igamma**2), np.sum(igamma)],
     [np.sum(igamma**2), np.sum(igamma), len(igamma)]])
 
