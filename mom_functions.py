@@ -17,6 +17,7 @@ import itertools as it
 from copy import deepcopy
 import matplotlib.colors as colors
 import seaborn
+import moments
 import warnings
 warnings.filterwarnings('error')
 
@@ -55,10 +56,6 @@ mk = [False] + [True]*(n-1) + [False]
 
 iter = np.arange(1,n)
 iterm1p1 = np.arange(2,n-1)
-
-
-# In[5]:
-
 
 ## borrowed directly from https://bitbucket.org/simongravel/moments/src/main/moments/Jackknife.pyx
 def python2round(f):
@@ -153,9 +150,7 @@ def run_mom_iterate_changing(n, s, Nc, mu, misc):
     mom = np.zeros((len(Nc)+1,n+1))
     # momnp1 = np.zeros(n+1)
     momkp1 = np.zeros(n+1)
-
-    dt = 1
-
+    
     changepoints = len(Nc) - np.concatenate((np.array([0]),np.where(Nc[:-1] != Nc[1:])[0]+1),axis=0)
     changepoints = np.append(changepoints, 0)
 
@@ -178,6 +173,32 @@ def run_mom_iterate_changing(n, s, Nc, mu, misc):
             mom[gen,] = deepcopy(momkp1)
 
     return mom[:-1,:]           
+
+def get_ll_freqchanging(g, opts, sXlred, n=1000, cutoff=2):
+    fs = moments.Spectrum(np.zeros(n+1))
+    fs[1] = 1
+    fs.integrate(opts['nu'], opts['T'], gamma=g*opts['Nc0'], dt_fac=opts['dt_fac'], theta=opts['theta'])
+    fs[fs<0] = 1e-250
+    pxs = fs/np.sum(fs[np.arange(cutoff,n-cutoff+1)])
+
+    res = np.empty(np.sum((sXlred>cutoff) & (sXlred<n-cutoff+1))) #np.empty(len(Xlred))
+
+    # just performing a search in a look-up table
+    for idx, i in enumerate(np.where((sXlred>cutoff) & (sXlred<n-cutoff+1))[0]):
+        res[idx] = pxs[sXlred[i]]
+    
+    return -np.sum(np.log(res))
+
+def get_ll_freqagechanging(g, opts, sXlred, alred, n=1000, cutoff=2):
+    pxas = run_mom_iterate_changing(n, 2*g, opts['Nc'][::-1], 1.25e-8, misc = {'dt_fac':0.02, 'adapt_dt':True})
+    
+    pxas[:,np.arange(cutoff,n-cutoff+1)] = pxas[:,np.arange(cutoff,n-cutoff+1)]/np.sum(pxas[:,np.arange(cutoff,n-cutoff+1)]) 
+
+    res = np.empty(np.sum((sXlred>cutoff) & (sXlred<n-cutoff+1)))
+    for idx, i in enumerate(np.where((sXlred>cutoff) & (sXlred<n-cutoff+1))[0]):
+        res[idx] = pxas[-int(alred[i]),sXlred[i]]
+
+    return -np.sum(np.log(res))
 
 ## packaging into a function for easy manipulation - iteration implementation 
 # input: a (number of gens), n (number of samples), s, N (pop size)
