@@ -12,11 +12,10 @@ from scipy.sparse import linalg
 from numpy.random import default_rng
 # plotting + misc tools
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import itertools as it
+# import matplotlib.patches as mpatches
+# import itertools as it
 from copy import deepcopy
-import matplotlib.colors as colors
-import seaborn
+# import matplotlib.colors as colors
 import moments
 import warnings
 warnings.filterwarnings('error')
@@ -34,28 +33,24 @@ plt.rcParams.update({"figure.facecolor": "white"})
 # set numpy print option to a more readable format for floats
 np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
 
+# N = 10000
+# s = -10/N # 25/N -> gamma = 50 - strong selection
+# mu = 1.25e-8 # human mutation rate
+# n = 2000 # 2 * # of inds sampled, diploid
 
-# In[4]:
+# # start in generation 10 so generation 11 has all zeros (going back in time)
+# tot_gen = 10000
+# time_steps = np.linspace(0, tot_gen-1, 100, dtype=int)
 
+# mom = np.zeros((tot_gen+1,n+1))
+# momnp1 = np.zeros(n+1)
+# momkp1 = np.zeros((tot_gen+1,n+1))
 
-N = 10000
-s = -10/N # 25/N -> gamma = 50 - strong selection
-mu = 1.25e-8 # human mutation rate
-n = 2000 # 2 * # of inds sampled, diploid
+# # double precaution - creating a mask
+# mk = [False] + [True]*(n-1) + [False]
 
-# start in generation 10 so generation 11 has all zeros (going back in time)
-tot_gen = 10000
-time_steps = np.linspace(0, tot_gen-1, 100, dtype=int)
-
-mom = np.zeros((tot_gen+1,n+1))
-momnp1 = np.zeros(n+1)
-momkp1 = np.zeros((tot_gen+1,n+1))
-
-# double precaution - creating a mask
-mk = [False] + [True]*(n-1) + [False]
-
-iter = np.arange(1,n)
-iterm1p1 = np.arange(2,n-1)
+# iter = np.arange(1,n)
+# iterm1p1 = np.arange(2,n-1)
 
 ## borrowed directly from https://bitbucket.org/simongravel/moments/src/main/moments/Jackknife.pyx
 def python2round(f):
@@ -147,10 +142,10 @@ def calcS(d, ljk):
     return coo_matrix((data, (row, col)), shape=(d, d), dtype='float').tocsc()
 
 def run_mom_iterate_changing(n, s, Nc, mu, misc):
-    mom = np.zeros((len(Nc)+1,n+1))
+    mom = np.zeros((len(Nc)+1,n+1),dtype=np.float32)
     # momnp1 = np.zeros(n+1)
-    momkp1 = np.zeros(n+1)
-    
+    momkp1 = np.zeros(n+1,dtype=np.float32)
+
     changepoints = len(Nc) - np.concatenate((np.array([0]),np.where(Nc[:-1] != Nc[1:])[0]+1),axis=0)
     changepoints = np.append(changepoints, 0)
 
@@ -172,41 +167,159 @@ def run_mom_iterate_changing(n, s, Nc, mu, misc):
 
             mom[gen,] = deepcopy(momkp1)
 
-    return mom[:-1,:]           
+    return mu*mom[:-1,:]           
 
-def get_ll_freqchanging(g, opts, sXlred, n=1000, cutoff=2):
-    fs = moments.Spectrum(np.zeros(n+1))
-    fs[1] = 1
-    fs.integrate(opts['nu'], opts['T'], gamma=g*opts['Nc0'], dt_fac=opts['dt_fac'], theta=opts['theta'])
-    fs[fs<0] = 1e-250
-    pxs = fs/np.sum(fs[np.arange(cutoff,n-cutoff+1)])
-
-    res = np.empty(np.sum((sXlred>cutoff) & (sXlred<n-cutoff+1))) #np.empty(len(Xlred))
+## creating a log-likelihood function that actually captures the true value using Poisson dist
+def get_lp_xl_pois(pxas, g, sXlred, n=2000, cutoff=2):
+    """function to compute L(gamma|Xl), where gamma is a range of values and Xl is a given set of freqs"""
+    res = np.empty(np.sum((sXlred>=cutoff) & (sXlred<=n-cutoff+1))) #np.empty(len(Xlred))
 
     # just performing a search in a look-up table
-    for idx, i in enumerate(np.where((sXlred>cutoff) & (sXlred<n-cutoff+1))[0]):
-        res[idx] = pxs[sXlred[i]]
+    for idx, i in enumerate(np.where((sXlred>=cutoff) & (sXlred<=n-cutoff+1))[0]):
+        res[idx] = -pxas[g][sXlred[i]] + np.log(pxas[g][sXlred[i]])*sXlred[i] - sp.special.gammaln(sXlred[i]+1)
     
-    return -np.sum(np.log(res))
+    return res
+def get_lp_xl_bin(pxas, g, sXlred, n=2000, cutoff=2):
+    """function to compute L(gamma|Xl), where gamma is a range of values and Xl is a given set of freqs"""
+    res = np.empty(np.sum((sXlred>=cutoff) & (sXlred<=n-cutoff+1))) #np.empty(len(Xlred))
 
-def get_ll_freqagechanging(g, opts, sXlred, alred, n=1000, cutoff=2):
-    pxas = run_mom_iterate_changing(n, 2*g, opts['Nc'][::-1], 1.25e-8, misc = {'dt_fac':0.02, 'adapt_dt':True})
+    # just performing a search in a look-up table
+    for idx, i in enumerate(np.where((sXlred>=cutoff) & (sXlred<=n-cutoff+1))[0]):
+        res[idx] = sp.stats.binom.logpmf(sXlred[i], n, pxas[g][sXlred[i]])
     
-    pxas[:,np.arange(cutoff,n-cutoff+1)] = pxas[:,np.arange(cutoff,n-cutoff+1)]/np.sum(pxas[:,np.arange(cutoff,n-cutoff+1)]) 
+    return res
 
-    res = np.empty(np.sum((sXlred>cutoff) & (sXlred<n-cutoff+1)))
-    for idx, i in enumerate(np.where((sXlred>cutoff) & (sXlred<n-cutoff+1))[0]):
-        res[idx] = pxas[-int(alred[i]),sXlred[i]]
+def get_ll_freqconstant(g, opts, n=2000, cutoff=2):
+    gamma = 10**g
 
-    return -np.sum(np.log(res))
+    fs = moments.LinearSystem_1D.steady_state_1D(2000, gamma=-gamma)
+    fs = moments.Spectrum(fs)
+    fs.integrate([1], 3, gamma=-gamma, theta=opts['theta']) ## for PReFerSim, we need 0.5Ne instead of Ne
+    fs = fs.project([n]) 
+    fs[fs<0] = -fs[fs<0]
+    
+    fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
+
+    res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
+
+    return -res
+
+def get_ll_freqconstantTE(g, opts, n=2000, cutoff=2):
+    gamma = 10**g
+
+    fs = moments.LinearSystem_1D.steady_state_1D(5000, gamma=-gamma)
+    fs = moments.Spectrum(fs)
+    fs.integrate([0.1], 0.25, gamma=-gamma, theta=opts['theta']) 
+    fs.integrate([1], 5, gamma=-gamma, theta=opts['theta'])
+    fs = fs.project([n]) 
+    fs[fs<0] = -fs[fs<0]
+
+    fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
+
+    res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
+
+    return -res
+
+def get_ll_freqcondageconstant(g, opts, n=2000, cutoff=2):
+    gamma = 10**g
+
+    fsa = run_mom_iterate_constant(opts['age'], n, -gamma/opts['N'], opts['N'], opts['theta'], {})
+    
+    fs = fsa[-opts['age'],:]
+    fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
+
+    res = np.nansum(-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1))
+
+    return -res
+
+def get_mean_est(g, opts):
+    ''' This function was written to check if there was a way to recover the hyperparameter used to simulate
+    the expectation (from which we draw the Poisson data). It looks like we can (truth lies within 95% CI). 
+    '''
+    fsa = rng.poisson(g, size=opts['SMS'].shape)
+    fsa[fsa==0] = 1
+
+    res = 0
+    for i in range(1,opts['SMS'].shape[0]):
+        for j in range(1,opts['SMS'].shape[1]):
+            res += -fsa[-i,j] + np.log(fsa[-i,j])*opts['SMS'][i,j] - sp.special.gammaln(opts['SMS'][i,j]+1)
+
+    return -res
+
+def get_ll_freqageconstant(g, opts, n=2000, cutoff=2):
+    gamma = 10**g
+    thresh = 1e-3
+
+    fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], opts['theta'], {})
+    fsa[fsa<0] = -fsa[fsa<0]
+
+    fsa = (1 - opts['p_misid']) * fsa + opts['p_misid'] * fsa[:,::-1]
+
+    res = 0
+    nzidx = opts['sms'].nonzero()
+    for i in range(len(nzidx[0])):
+        res += -fsa[-nzidx[0][i],nzidx[1][i]] + np.log(fsa[-nzidx[0][i],nzidx[1][i]])*opts['sms'][nzidx[0][i],nzidx[1][i]] - sp.special.gammaln(opts['sms'][nzidx[0][i],nzidx[1][i]] + 1)
+    
+    # fsminidx = np.where(fsa.sum(axis=1)<thresh)[0][-1]
+    # if (fsa.shape[0] - fsminidx) > nzidx[0][-1]:
+    #     fsa = fsa[fsminidx:,:]
+    #     zidx = np.where(opts['sms'][:(fsa.shape[0] - fsminidx),:]==0)
+    #     for i in range(len(zidx[0])):
+    #         res += -fsa[-zidx[0][i],zidx[1][i]]
+    # else:
+    zidx = np.where(opts['sms'][:20000,:]==0)
+    for i in range(len(zidx[0])):
+        res += -fsa[-zidx[0][i],zidx[1][i]]
+    
+    return -res
+
+def get_ll_freqchanging(g, opts, n=1000, cutoff=2):
+    alpha, beta = 10**g
+    dxs = ((opts['gamma'] - np.concatenate(([opts['gamma'][0]], opts['gamma']))[:-1]) / 2 + (np.concatenate((opts['gamma'], [opts['gamma'][-1]]))[1:] - opts['gamma']) / 2)
+
+    weights = sp.stats.gamma.pdf(opts['gamma'], alpha, scale=beta)
+    fs = opts['p_xa_s'][0] * sp.stats.gamma.cdf(opts['gamma'][0],alpha,scale=beta)
+    for g, dx, w in zip(opts['gamma'], dxs, weights):
+        fs += opts['p_xa_s'][g] * dx * w
+
+    fs = opts['theta'] * fs
+    # fs = opts['sfs'].sum()/fs.sum() * fs
+    fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
+
+    res = 0
+    # for i in range(1,len(opts['sfs'])-1):
+    #     res += -fs[i] + np.log(fs[i])*opts['sfs'][i] - sp.special.gammaln(opts['sfs'][i] + 1)
+    res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
+
+    return -res
+
+def get_ll_freqagechanging(g, opts, n=1000, cutoff=2):
+    alpha, beta = 10**g
+    dxs = ((opts['gamma'] - np.concatenate(([opts['gamma'][0]], opts['gamma']))[:-1]) / 2 + (np.concatenate((opts['gamma'], [opts['gamma'][-1]]))[1:] - opts['gamma']) / 2)
+
+    weights = sp.stats.gamma.pdf(opts['gamma'], alpha, scale=beta)
+    fsa = opts['up_xa_s'][0] * sp.stats.gamma.cdf(opts['gamma'][0],alpha,scale=beta)
+    for g, dx, w in zip(opts['gamma'], dxs, weights):
+        fsa += opts['up_xa_s'][g] * dx * w
+    
+    fsa = opts['theta'] * fsa
+    # fsa = opts['sms'].sum()/fsa.sum() * fsa
+    fsa = (1 - opts['p_misid']) * fsa + opts['p_misid'] * fsa[:,::-1]
+
+    res = 0
+    nzidx = opts['sms'].nonzero()
+    for i in range(len(nzidx[0])):
+        res += -fsa[-nzidx[0][i],nzidx[1][i]] + np.log(fsa[-nzidx[0][i],nzidx[1][i]])*opts['sms'][nzidx[0][i],nzidx[1][i]] - sp.special.gammaln(opts['sms'][nzidx[0][i],nzidx[1][i]] + 1)
+
+    return -res
 
 ## packaging into a function for easy manipulation - iteration implementation 
 # input: a (number of gens), n (number of samples), s, N (pop size)
 # output: mom (number of sites)
-def run_mom_iterate_constant(a, n, s, N, mu, misc):
-    mom = np.zeros((a+1,n+1))
+def run_mom_iterate_constant(a, n, s, N, theta, misc):
+    mom = np.zeros((a+1,n+1),dtype=np.float32)
     # momnp1 = np.zeros(n+1)
-    momkp1 = np.zeros(n+1)
+    momkp1 = np.zeros(n+1,dtype=np.float32)
 
     dt = 1
 
@@ -221,22 +334,10 @@ def run_mom_iterate_constant(a, n, s, N, mu, misc):
     iter = np.arange(1,n)
     iterm1p1 = np.arange(2,n-1)
 
-    mom[a,1] = 1 # singleton input
+    mom[a,1] = theta # singleton input
 
     # going from generation 9 to 0
     for gen in np.arange(a)[::-1]:
-        # momkp1[iterm1p1] = 0.25/N * (mom[gen+1,iterm1p1-1] * (iterm1p1-1)*(n-iterm1p1+1) + mom[gen+1,iterm1p1+1] * (iterm1p1+1)*(n-iterm1p1-1) - mom[gen+1,iterm1p1] * 2*iterm1p1*(n-iterm1p1))
-
-        # momkp1[1] = 0.25/N * ((n-2) * 2 * mom[gen+1,2] - 2 * (n-1) * mom[gen+1,1])
-        # momkp1[n-1] = 0.25/N * ((n-2) * 2 * mom[gen+1,n-2] - 2 * (n-1) * mom[gen+1,n-1])
-
-        # # notice the difference in indexing for LHS
-        # momnp1[np.arange(1,n+1)] = (J @ mom[gen+1,iter])
-
-        # momkp1[iter] += 0.5 * s/(n+1) * (iter * (n+1-iter) * momnp1[iter] - (n-iter) * (iter+1) * momnp1[iter+1])
-        
-        # momkp1[1:n] = mom[gen+1,1:n] + ((D[1:n,1:n] + S[1:n,1:n]) @ mom[gen+1,1:n])
-
         momkp1 = slv(Q.dot(mom[gen+1,]))
         momkp1[0] = momkp1[n] = 0.0
 
@@ -304,7 +405,7 @@ def get_lp_alxl(up_xa_s, g, sXlred, alred, n=2000, cutoff=20):
         # if too many gens, then pass in a very low number (like -400.)
         # res[i] = np.log(p_xa_s[g][-int(alred[i]),np.argmin(np.abs(Xlred[i]-Xsamp))+1]) if (int(alred[i]<p_xa_s[g].shape[0])) else -400. 
         try:
-            res[idx] = np.log(up_xa_s[g][-int(alred[i]),sXlred[i]]) if (int(alred[i])<up_xa_s[g].shape[0]) else np.median(np.log(up_xa_s[g][0,:]))
+            res[idx] = np.log(up_xa_s[g][-int(alred[i]),sXlred[i]]) #if (int(alred[i])<up_xa_s[g].shape[0]) else np.median(np.log(up_xa_s[g][0,:]))
         except RuntimeWarning:
             print(g, sXlred[i], alred[i])
         # if np.isinf(res[idx]):
