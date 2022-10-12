@@ -189,6 +189,41 @@ def get_lp_xl_bin(pxas, g, sXlred, n=2000, cutoff=2):
     
     return res
 
+def get_ll_freqdemchanging(s, opts, n=200,):
+    selcoef = 10**s
+
+    fs = moments.LinearSystem_1D.steady_state_1D(2000, gamma=-selcoef*opts['Nc0'])
+    fs = moments.Spectrum(fs)
+    fs.integrate(opts['nu'], opts['T'], gamma=-selcoef*opts['Nc0'], dt_fac=0.0005, theta=opts['theta'])
+    fs = fs.project([n]) 
+    fs[fs<0] = -fs[fs<0]
+    
+    fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
+
+    res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
+
+    return -res
+
+def get_ll_freqagedemchanging(s, opts, n=200):
+    selcoef = 10**s
+
+    fsa = run_mom_iterate_changing(n, -selcoef, opts['Nc'], opts['theta'], {})
+    fsa[fsa<0] = -fsa[fsa<0]
+
+    fsa = (1 - opts['p_misid']) * fsa + opts['p_misid'] * fsa[:,::-1]
+
+    res = 0
+    nzidx = opts['sms'].nonzero()
+    for i in range(len(nzidx[0])):
+        res += -fsa[-nzidx[0][i],nzidx[1][i]] + np.log(fsa[-nzidx[0][i],nzidx[1][i]])*opts['sms'][nzidx[0][i],nzidx[1][i]] - sp.special.gammaln(opts['sms'][nzidx[0][i],nzidx[1][i]] + 1)
+
+    zidx = np.where(opts['sms']==0)
+    for i in range(len(zidx[0])):
+        res += -fsa[-zidx[0][i],zidx[1][i]]
+
+    return -res
+
+
 def get_ll_freqconstant(g, opts, n=2000, cutoff=2):
     gamma = 10**g
 
@@ -248,28 +283,13 @@ def get_mean_est(g, opts):
 
 def get_ll_freqageconstant(g, opts, n=2000, cutoff=2):
     gamma = 10**g
-    thresh = 1e-3
 
-    fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], opts['theta'], {})
+    fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], opts['theta'], {})[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
 
     fsa = (1 - opts['p_misid']) * fsa + opts['p_misid'] * fsa[:,::-1]
 
-    res = 0
-    nzidx = opts['sms'].nonzero()
-    for i in range(len(nzidx[0])):
-        res += -fsa[-nzidx[0][i],nzidx[1][i]] + np.log(fsa[-nzidx[0][i],nzidx[1][i]])*opts['sms'][nzidx[0][i],nzidx[1][i]] - sp.special.gammaln(opts['sms'][nzidx[0][i],nzidx[1][i]] + 1)
-    
-    # fsminidx = np.where(fsa.sum(axis=1)<thresh)[0][-1]
-    # if (fsa.shape[0] - fsminidx) > nzidx[0][-1]:
-    #     fsa = fsa[fsminidx:,:]
-    #     zidx = np.where(opts['sms'][:(fsa.shape[0] - fsminidx),:]==0)
-    #     for i in range(len(zidx[0])):
-    #         res += -fsa[-zidx[0][i],zidx[1][i]]
-    # else:
-    zidx = np.where(opts['sms'][:20000,:]==0)
-    for i in range(len(zidx[0])):
-        res += -fsa[-zidx[0][i],zidx[1][i]]
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['SMS'][1:,1:] - sp.special.gammaln(opts['SMS'][1:,1:]+1))
     
     return -res
 
@@ -282,13 +302,9 @@ def get_ll_freqchanging(g, opts, n=1000, cutoff=2):
     for g, dx, w in zip(opts['gamma'], dxs, weights):
         fs += opts['p_xa_s'][g] * dx * w
 
-    fs = opts['theta'] * fs
-    # fs = opts['sfs'].sum()/fs.sum() * fs
+    # fs = opts['theta'] * fs
     fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
 
-    res = 0
-    # for i in range(1,len(opts['sfs'])-1):
-    #     res += -fs[i] + np.log(fs[i])*opts['sfs'][i] - sp.special.gammaln(opts['sfs'][i] + 1)
     res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
 
     return -res
@@ -302,14 +318,16 @@ def get_ll_freqagechanging(g, opts, n=1000, cutoff=2):
     for g, dx, w in zip(opts['gamma'], dxs, weights):
         fsa += opts['up_xa_s'][g] * dx * w
     
-    fsa = opts['theta'] * fsa
-    # fsa = opts['sms'].sum()/fsa.sum() * fsa
     fsa = (1 - opts['p_misid']) * fsa + opts['p_misid'] * fsa[:,::-1]
 
-    res = 0
-    nzidx = opts['sms'].nonzero()
-    for i in range(len(nzidx[0])):
-        res += -fsa[-nzidx[0][i],nzidx[1][i]] + np.log(fsa[-nzidx[0][i],nzidx[1][i]])*opts['sms'][nzidx[0][i],nzidx[1][i]] - sp.special.gammaln(opts['sms'][nzidx[0][i],nzidx[1][i]] + 1)
+    res = np.nansum(-fsa[::-1][:-1,1:] + np.log(fsa[::-1][:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+    # nzidx = opts['sms'].nonzero()
+    # for i in range(len(nzidx[0])):
+    #     res += -fsa[-nzidx[0][i],nzidx[1][i]] + np.log(fsa[-nzidx[0][i],nzidx[1][i]])*opts['sms'][nzidx[0][i],nzidx[1][i]] - sp.special.gammaln(opts['sms'][nzidx[0][i],nzidx[1][i]] + 1)
+
+    # zidx = np.where(opts['sms'][:opts['gens'],:]==0)
+    # for i in range(len(zidx[0])):
+    #     res += -fsa[-zidx[0][i],zidx[1][i]]
 
     return -res
 
