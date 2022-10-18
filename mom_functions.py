@@ -33,25 +33,6 @@ plt.rcParams.update({"figure.facecolor": "white"})
 # set numpy print option to a more readable format for floats
 np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
 
-# N = 10000
-# s = -10/N # 25/N -> gamma = 50 - strong selection
-# mu = 1.25e-8 # human mutation rate
-# n = 2000 # 2 * # of inds sampled, diploid
-
-# # start in generation 10 so generation 11 has all zeros (going back in time)
-# tot_gen = 10000
-# time_steps = np.linspace(0, tot_gen-1, 100, dtype=int)
-
-# mom = np.zeros((tot_gen+1,n+1))
-# momnp1 = np.zeros(n+1)
-# momkp1 = np.zeros((tot_gen+1,n+1))
-
-# # double precaution - creating a mask
-# mk = [False] + [True]*(n-1) + [False]
-
-# iter = np.arange(1,n)
-# iterm1p1 = np.arange(2,n-1)
-
 ## borrowed directly from https://bitbucket.org/simongravel/moments/src/main/moments/Jackknife.pyx
 def python2round(f):
     if round(f + 1) - round(f) != 1:
@@ -149,7 +130,7 @@ def run_mom_iterate_changing(n, s, Nc, mu, misc):
     changepoints = len(Nc) - np.concatenate((np.array([0]),np.where(Nc[:-1] != Nc[1:])[0]+1),axis=0)
     changepoints = np.append(changepoints, 0)
 
-    mom[len(Nc),1] = 1 # singleton input
+    mom[len(Nc),1] = mu # singleton input
     
     # only need to do this once - no dependence on N
     J = calcJK13(n)
@@ -167,7 +148,7 @@ def run_mom_iterate_changing(n, s, Nc, mu, misc):
 
             mom[gen,] = deepcopy(momkp1)
 
-    return mu*mom[:-1,:]           
+    return mom[:-1,:]           
 
 ## creating a log-likelihood function that actually captures the true value using Poisson dist
 def get_lp_xl_pois(pxas, g, sXlred, n=2000, cutoff=2):
@@ -190,13 +171,13 @@ def get_lp_xl_bin(pxas, g, sXlred, n=2000, cutoff=2):
     return res
 
 def get_ll_freqdemchanging(s, opts, n=200,):
-    selcoef = 10**s
+    selcoef = 2*10**s
 
-    fs = moments.LinearSystem_1D.steady_state_1D(2000, gamma=-selcoef*opts['Nc0'])
+    fs = moments.LinearSystem_1D.steady_state_1D(2000, gamma=-selcoef)
     fs = moments.Spectrum(fs)
-    fs.integrate(opts['nu'], opts['T'], gamma=-selcoef*opts['Nc0'], dt_fac=0.0005, theta=opts['theta'])
+    fs.integrate(opts['nu'], opts['T'], gamma=-selcoef, dt_fac=0.0005, theta=opts['theta'])
     fs = fs.project([n]) 
-    fs[fs<0] = -fs[fs<0]
+    fs[fs<0] = 0
     
     fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
 
@@ -207,19 +188,12 @@ def get_ll_freqdemchanging(s, opts, n=200,):
 def get_ll_freqagedemchanging(s, opts, n=200):
     selcoef = 10**s
 
-    fsa = run_mom_iterate_changing(n, -selcoef, opts['Nc'], opts['theta'], {})
-    fsa[fsa<0] = -fsa[fsa<0]
+    fsa = run_mom_iterate_changing(n, -2*selcoef/(opts['Nc'][0]/2), opts['Nc']/2, opts['theta'], {})[::-1]
+    fsa[fsa<0] = 0
 
     fsa = (1 - opts['p_misid']) * fsa + opts['p_misid'] * fsa[:,::-1]
 
-    res = 0
-    nzidx = opts['sms'].nonzero()
-    for i in range(len(nzidx[0])):
-        res += -fsa[-nzidx[0][i],nzidx[1][i]] + np.log(fsa[-nzidx[0][i],nzidx[1][i]])*opts['sms'][nzidx[0][i],nzidx[1][i]] - sp.special.gammaln(opts['sms'][nzidx[0][i],nzidx[1][i]] + 1)
-
-    zidx = np.where(opts['sms']==0)
-    for i in range(len(zidx[0])):
-        res += -fsa[-zidx[0][i],zidx[1][i]]
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
 
     return -res
 
@@ -255,18 +229,6 @@ def get_ll_freqconstantTE(g, opts, n=2000, cutoff=2):
 
     return -res
 
-def get_ll_freqcondageconstant(g, opts, n=2000, cutoff=2):
-    gamma = 10**g
-
-    fsa = run_mom_iterate_constant(opts['age'], n, -gamma/opts['N'], opts['N'], opts['theta'], {})
-    
-    fs = fsa[-opts['age'],:]
-    fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
-
-    res = np.nansum(-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1))
-
-    return -res
-
 def get_mean_est(g, opts):
     ''' This function was written to check if there was a way to recover the hyperparameter used to simulate
     the expectation (from which we draw the Poisson data). It looks like we can (truth lies within 95% CI). 
@@ -289,7 +251,7 @@ def get_ll_freqageconstant(g, opts, n=2000, cutoff=2):
 
     fsa = (1 - opts['p_misid']) * fsa + opts['p_misid'] * fsa[:,::-1]
 
-    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['SMS'][1:,1:] - sp.special.gammaln(opts['SMS'][1:,1:]+1))
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
     
     return -res
 
@@ -302,10 +264,9 @@ def get_ll_freqchanging(g, opts, n=1000, cutoff=2):
     for g, dx, w in zip(opts['gamma'], dxs, weights):
         fs += opts['p_xa_s'][g] * dx * w
 
-    # fs = opts['theta'] * fs
-    fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
+    # fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
 
-    res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
+    res = np.nansum(-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1))
 
     return -res
 
@@ -318,16 +279,11 @@ def get_ll_freqagechanging(g, opts, n=1000, cutoff=2):
     for g, dx, w in zip(opts['gamma'], dxs, weights):
         fsa += opts['up_xa_s'][g] * dx * w
     
+    fsa[fsa>1000] = 0
+
     fsa = (1 - opts['p_misid']) * fsa + opts['p_misid'] * fsa[:,::-1]
 
     res = np.nansum(-fsa[::-1][:-1,1:] + np.log(fsa[::-1][:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
-    # nzidx = opts['sms'].nonzero()
-    # for i in range(len(nzidx[0])):
-    #     res += -fsa[-nzidx[0][i],nzidx[1][i]] + np.log(fsa[-nzidx[0][i],nzidx[1][i]])*opts['sms'][nzidx[0][i],nzidx[1][i]] - sp.special.gammaln(opts['sms'][nzidx[0][i],nzidx[1][i]] + 1)
-
-    # zidx = np.where(opts['sms'][:opts['gens'],:]==0)
-    # for i in range(len(zidx[0])):
-    #     res += -fsa[-zidx[0][i],zidx[1][i]]
 
     return -res
 
@@ -348,9 +304,6 @@ def run_mom_iterate_constant(a, n, s, N, theta, misc):
     # if N is same across all gens then only have to do this once
     slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - dt / 2.0 * (D + S))
     Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + dt / 2.0 * (D + S)
-
-    iter = np.arange(1,n)
-    iterm1p1 = np.arange(2,n-1)
 
     mom[a,1] = theta # singleton input
 
