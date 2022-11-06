@@ -130,7 +130,7 @@ def run_mom_iterate_changing(n, s, Nc, mu, misc):
     changepoints = len(Nc) - np.concatenate((np.array([0]),np.where(Nc[:-1] != Nc[1:])[0]+1),axis=0)
     changepoints = np.append(changepoints, 0)
 
-    mom[len(Nc),1] = mu # singleton input
+    mom[len(Nc),1] = n*mu/(4*Nc[-1]) # singleton input
     
     # only need to do this once - no dependence on N
     J = calcJK13(n)
@@ -305,8 +305,8 @@ def run_mom_iterate_constant(a, n, s, N, theta, misc):
     slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - dt / 2.0 * (D + S))
     Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + dt / 2.0 * (D + S)
 
-    mom[a,1] = theta # singleton input
-
+    mom[a,1] = n*theta/(4*N) # singleton input
+    
     # going from generation 9 to 0
     for gen in np.arange(a)[::-1]:
         momkp1 = slv(Q.dot(mom[gen+1,]))
@@ -504,3 +504,33 @@ def resample_calculateprob_age(newdat, gamma, num_sims=16, num_samps=500, thresh
 
     return [prob/num_sims, estgonlyage, np.array([estg1onlyage, estg2onlyage])]
 
+def logsumexp(a, axis = None, return_sign = False, keepdims = False):
+    """
+    log(sum(exp(A))) = M + log(sum(exp(A - M)))
+    """
+
+    a_max = np.amax(a, axis=axis, keepdims=True)
+
+    if a_max.ndim > 0:
+        a_max[~np.isfinite(a_max)] = 0
+    elif not np.isfinite(a_max):
+        a_max = 0
+
+    tmp = np.exp(a - a_max)
+
+    # suppress warnings about log of zero
+    with np.errstate(divide='ignore'):
+        s = np.sum(tmp, axis=axis, keepdims=keepdims)
+        if return_sign:
+            sgn = np.sign(s)
+            s *= sgn  # /= makes more sense but we need zero -> zero
+        out = np.log(s)
+
+    if not keepdims:
+        a_max = np.squeeze(a_max, axis = axis)
+    out += a_max
+
+    if return_sign:
+        return out, sgn
+    else:
+        return out
