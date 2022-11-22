@@ -53,6 +53,17 @@ def calcJK13(n):
         J[i, ibis + 1] = (1.+n) * ((2.+i)*(2.+n)*(-2.+(i+1.)*(3.+n))-(4.+n)*(1.+n+2.*(i+1.)*(2.+n))*(ibis+1.)+(12.+7.*n+n**2)*(ibis+1.)**2) / (2.+n) / (3.+n) / (4.+n) / 2.
     return J
 
+def calcJK23(n):
+    J = np.zeros((n + 1, n - 1))
+    for i in range(n + 1):
+        ibis = index_bis(i + 1, n) - 1
+        if i == n - 1 or i == n:
+            ibis = n - 3
+        J[i, ibis] = -(1.+n) * ((2.+i)*(2.+n)*(-9.-n+(i+1.)*(3.+n))-2.*(5.+n)*(-2.+(i+1.)*(2.+n))*(ibis+1.)+(20.+9.*n+n**2)*(ibis+1.)**2) / (3.+n) / (4.+n) / (5.+n)
+        J[i, ibis - 1] = (1.+n) * (12.+(1.+i)**2*(6.+5.*n+n**2)-(i+1.)*(22.+13.*n+n**2)-(5.+n)*(-8.-n+2.*(i+1.)*(2.+n))*(ibis+1.)+(20.+9.*n+n**2)*(ibis+1.)**2) / (3.+n) / (4.+n) / (5.+n) / 2.
+        J[i, ibis + 1] = (1.+n) * ((2.+i)*(2.+n)*(-4.+(i+1.)*(3.+n))-(5.+n)*(n+2.*(i+1.)*(2.+n))*(ibis+1.)+(20.+9.*n+n**2)*(ibis+1.)**2) / (3.+n) / (4.+n) / (5.+n) / 2.
+    return J
+
 def calcD(d):
     # res = np.zeros([d, d])
     # # loop over the fs elements:
@@ -122,6 +133,34 @@ def calcS(d, ljk):
 
     return coo_matrix((data, (row, col)), shape=(d, d), dtype='float').tocsc()
 
+# selection with h!=1/2
+def calcS2(d, ljk):
+    # arrays for the creation of the sparse (coo) matrix
+    data = []
+    row = []
+    col = []
+    for i in range(d):
+        i_ter = index_bis(i + 1, d - 1)
+        i_qua = index_bis(i + 2, d - 1)
+        # coefficients
+        g1 = (i+1) / np.float64(d) / (d+1.0) * i * (d-i)
+        g2 = -(i+1) / np.float64(d) / (d+1.0) * (i+2) * (d-1-i)
+        
+        if i < d - 1:
+            data += [g1 * ljk[i, i_ter - 1], g1 * ljk[i, i_ter - 2],
+                     g1 * ljk[i, i_ter], g2 * ljk[i + 1, i_qua - 1],
+                     g2 * ljk[i + 1, i_qua - 2], g2 * ljk[i + 1, i_qua]]
+            row += 6 * [i]
+            col += [i_ter, i_ter - 1, i_ter + 1,
+                    i_qua, i_qua - 1, i_qua + 1]
+    
+        elif i == d - 1: # g2=0
+            data += [g1 * ljk[i, i_ter - 1], g1 * ljk[i, i_ter - 2], g1 * ljk[i, i_ter]]
+            row += 3 * [i]
+            col += [i_ter, i_ter - 1, i_ter + 1]
+
+    return coo_matrix((data, (row, col)), shape=(d, d), dtype='float').tocsc()
+
 def run_mom_iterate_changing(n, s, Nc, mu, misc):
     mom = np.zeros((len(Nc)+1,n+1),dtype=np.float32)
     # momnp1 = np.zeros(n+1)
@@ -130,7 +169,7 @@ def run_mom_iterate_changing(n, s, Nc, mu, misc):
     changepoints = len(Nc) - np.concatenate((np.array([0]),np.where(Nc[:-1] != Nc[1:])[0]+1),axis=0)
     changepoints = np.append(changepoints, 0)
 
-    mom[len(Nc),1] = n*mu/(4*Nc[-1]) # singleton input
+    mom[len(Nc),1] = n*mu/(4*Nc[0]) # singleton input
     
     # only need to do this once - no dependence on N
     J = calcJK13(n)
@@ -213,6 +252,33 @@ def get_ll_freqconstant(g, opts, n=2000, cutoff=2):
 
     return -res
 
+def get_ll_freqrecconstant(g, opts, n=2000, cutoff=2):
+    gamma = 10**g[0]
+
+    fs = moments.LinearSystem_1D.steady_state_1D(2000, gamma=-gamma, h=g[1], theta=opts['theta'],)
+    fs = moments.Spectrum(fs)
+    fs.integrate([1], 3, gamma=-gamma, theta=opts['theta'], h=g[1]) ## for PReFerSim, we need 0.5Ne instead of Ne
+    fs = fs.project([n]) 
+    fs[fs<0] = -fs[fs<0]
+    
+    fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
+
+    res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
+
+    return -res
+
+def get_ll_freqagerecconstant(g, opts, n=2000, cutoff=2):
+    gamma = 10**g[0]
+
+    fsa = run_mom_iterate_constantrec(opts['gens'], n, -gamma/opts['N'], opts['N'], opts['theta'], g[1])[::-1]
+    fsa[fsa<0] = -fsa[fsa<0]  
+    
+    fsa = (1 - opts['p_misid']) * fsa + opts['p_misid'] * fsa[::-1]
+
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+    
+    return -res
+
 def get_ll_freqconstantTE(g, opts, n=2000, cutoff=2):
     gamma = 10**g
 
@@ -249,10 +315,76 @@ def get_ll_freqageconstant(g, opts, n=2000, cutoff=2):
     fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], opts['theta'], {})[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
 
-    fsa = (1 - opts['p_misid']) * fsa + opts['p_misid'] * fsa[:,::-1]
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+    
+    return -res
+
+def get_ll_freqageconstant_werr(g, opts, n=200,):
+    gamma = 10**g
+
+    fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], opts['theta'], {})[::-1]
+    fsa[fsa<0] = -fsa[fsa<0]
+
+    # get log-lik from the bins with NO data
+    res = -fsa[opts['sms']<1].sum()
+
+    nzidx = opts['sms'].nonzero()
+    for i in range(len(nzidx[0])):
+        # sd = (np.log(opts['CI'][nzidx[0][i]][nzidx[1][i]][1])-np.log(opts['CI'][nzidx[0][i]][nzidx[1][i]][0]))/(2*1.96)
+        # lowci = int(sp.stats.lognorm.ppf(0.01,sd,0,nzidx[0][i])); higci = int(sp.stats.lognorm.ppf(0.99,sd,0,nzidx[0][i]))
+        lowci = opts['CI'][nzidx[0][i]][nzidx[1][i]][0]; higci = opts['CI'][nzidx[0][i]][nzidx[1][i]][1]+1 if opts['CI'][nzidx[0][i]][nzidx[1][i]][1]+1 <=opts['gens'] else opts['gens']
+        sd = (np.log(higci)-np.log(lowci))/(2*1.96)
+        prwts = [sp.stats.lognorm.pdf(x,sd,0,nzidx[0][i]) for x in range(lowci,higci)]
+        prwts = prwts/np.sum(prwts)
+
+        tempres = np.zeros(higci-lowci)
+        for ia, a in enumerate(range(lowci,higci)):
+            tempres[ia] = -fsa[a][nzidx[1][i]] + np.log(fsa[a][nzidx[1][i]])*opts['sms'][a][nzidx[1][i]] - sp.special.gammaln(opts['sms'][a][nzidx[1][i]] + 1) + np.log(prwts[ia])
+
+        res += sp.special.logsumexp(tempres)
+
+    return -res
+
+def get_ll_thetaconstant(g, opts, n=200, cutoff=2):
+    """ function to calculate log-lik for single gamma & single theta value with constant pop size """
+    gamma, theta = 10**g
+
+    fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], theta, {})[::-1]
+    fsa[fsa<0] = -fsa[fsa<0]
+
+    # fsa = (1 - opts['p_misid']) * fsa + opts['p_misid'] * fsa[:,::-1]
 
     res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
     
+    return -res
+
+def get_ll_theta_bottleneck(g, opts, n=200):
+    """ function to calculate log-lik for single gamma and two theta values with two unknown changepoints """
+    gamma, theta1, theta2, changept, dur = 10**g
+
+    theta_vec = np.repeat(theta1, opts['sms'].shape[0])
+    theta_vec[int(changept):int(changept + dur)] = theta2
+
+    fsa = run_mom_iterate_theta(opts['gens'], n, -gamma/opts['N'], opts['N'], theta_vec, {})[::-1]
+    fsa[fsa<0] = -fsa[fsa<0]
+
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+
+    return -res
+
+def get_ll_theta_twoepoch(g, opts, n=200):
+    """ function to calculate log-lik for single gamma and two theta values with single changepoint """
+    gamma, theta1, theta2, changept = 10**g
+    # changept = g[-1]
+
+    theta_vec = np.repeat(theta1, opts['sms'].shape[0])
+    theta_vec[int(changept):] = theta2
+
+    fsa = run_mom_iterate_theta(opts['gens'], n, -gamma/opts['N'], opts['N'], theta_vec, {})[::-1]
+    fsa[fsa<0] = -fsa[fsa<0]
+
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+
     return -res
 
 def get_ll_freqchanging(g, opts, n=1000, cutoff=2):
@@ -306,7 +438,7 @@ def run_mom_iterate_constant(a, n, s, N, theta, misc):
     Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + dt / 2.0 * (D + S)
 
     mom[a,1] = n*theta/(4*N) # singleton input
-    
+
     # going from generation 9 to 0
     for gen in np.arange(a)[::-1]:
         momkp1 = slv(Q.dot(mom[gen+1,]))
@@ -315,6 +447,62 @@ def run_mom_iterate_constant(a, n, s, N, theta, misc):
         mom[gen,] = deepcopy(momkp1)
 
     return mom[:-1,:]           
+
+def run_mom_iterate_constantrec(a, n, s, N, theta, h):
+    mom = np.zeros((a+1,n+1),dtype=np.float32)
+    # momnp1 = np.zeros(n+1)
+    momkp1 = np.zeros(n+1,dtype=np.float32)
+
+    dt = 1
+
+    D = 0.25/N * calcD(n+1)
+    J = calcJK13(n)
+    J2 = calcJK23(n)
+    S = h * s * calcS(n+1, J)
+    S2 = s * (1-2*h) * calcS2(n+1, J2)
+
+    # if N is same across all gens then only have to do this once
+    slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - dt / 2.0 * (D + S + S2))
+    Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + dt / 2.0 * (D + S + S2)
+
+    mom[a,1] = n*theta/(4*N) # singleton input
+
+    # going from generation 9 to 0
+    for gen in np.arange(a)[::-1]:
+        momkp1 = slv(Q.dot(mom[gen+1,]))
+        momkp1[0] = momkp1[n] = 0.0
+
+        mom[gen,] = deepcopy(momkp1)
+
+    return mom[:-1,:]       
+
+def run_mom_iterate_theta(a, n, s, N, theta, misc):
+    # assert a == len(theta), "length of mutation rate should be equal to number of gens"
+    mom = np.zeros((a+1,n+1),dtype=np.float32)
+    # momnp1 = np.zeros(n+1)
+    momkp1 = np.zeros(n+1,dtype=np.float32)
+
+    dt = 1
+
+    D = 0.25/N * calcD(n+1)
+    J = calcJK13(n)
+    S = 0.5 * s * calcS(n+1, J)
+
+    # if N is same across all gens then only have to do this once
+    slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - dt / 2.0 * (D + S))
+    Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + dt / 2.0 * (D + S)
+
+    ## start with base theta = 1000
+    mom[a,1] = n*1000/(4*N) # singleton input
+
+    # going from generation 9 to 0
+    for gen in np.arange(a)[::-1]:
+        momkp1 = slv(Q.dot(mom[gen+1,]))
+        momkp1[0] = momkp1[n] = 0.0
+
+        mom[gen,] = deepcopy(momkp1)
+
+    return mom[:-1,:] * theta[::-1].reshape(-1,1)/1000
 
 ## function where each generation was integrated to separately
 def run_mom_integrate(a, n, s, N, mu, misc):
