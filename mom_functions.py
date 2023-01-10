@@ -267,6 +267,54 @@ def get_ll_freqrecconstant(g, opts, n=2000, cutoff=2):
 
     return -res
 
+def get_post_gammaMH(gi, propsd, numsteps, theta, freq, n=200):
+    # initial guess for alpha as array.
+    A = [gi]
+    # define stepsize of MCMC.
+    accepted  = 0
+    lltrace = []
+
+    old_gamma = gi
+    old_loglik = get_lpf_singlesite(old_gamma, {'theta':theta,'freq':freq}, n=n) + sp.stats.uniform.logpdf(10**old_gamma,0.01,100)
+    # lltrace.append(old_loglik)
+
+    for ii in range(1,numsteps):
+        # Suggest new candidate from Gaussian proposal distribution.
+        new_gamma = np.random.normal(old_gamma, propsd)
+        new_loglik = get_lpf_singlesite(new_gamma, {'theta':theta,'freq':freq}, n=n) + sp.stats.uniform.logpdf(10**new_gamma,0.01,100)
+
+        # Accept new candidate in Monte-Carlo fashion
+        if (new_loglik > old_loglik):
+            A.append(new_gamma)
+            accepted = accepted + 1  # monitor acceptance
+            lltrace.append(new_loglik)
+            old_gamma = new_gamma
+        else:
+            u = np.random.uniform(0,1,1)
+            if (u < np.exp(new_loglik - old_loglik)):
+                A.append(new_gamma)
+                accepted = accepted + 1  # monitor acceptance
+                lltrace.append(new_loglik)
+                old_gamma = new_gamma
+            else:
+                A.append(old_gamma)
+                lltrace.append(old_loglik)
+        if ii%1000 == 0:
+            print("Step {}...".format(ii))
+
+    return [10**np.array(A), lltrace, accepted]
+
+def get_lpf_singlesite(g, opts, n=200):
+    gamma = 10**g
+
+    fs = moments.LinearSystem_1D.steady_state_1D(2000, gamma=-gamma, theta=opts['theta'],)
+    fs = moments.Spectrum(fs)
+    fs.integrate([1], 3, gamma=-gamma, theta=opts['theta']) ## for PReFerSim, we need 0.5Ne instead of Ne
+    fs = fs.project([n]) 
+    fs[fs<0] = -fs[fs<0]
+
+    return np.log(fs[opts['freq']]/fs.sum())
+
 def get_ll_freqagerecconstant(g, opts, n=2000, cutoff=2):
     gamma = 10**g[0]
 
@@ -351,6 +399,9 @@ def get_ll_thetaconstant(g, opts, n=200, cutoff=2):
 
     fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], theta, {})[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
+
+    # to ensure that there is no -inf when taking log
+    fsa[fsa<np.min(fsa[fsa>0])] = np.min(fsa[fsa>0])
 
     # fsa = (1 - opts['p_misid']) * fsa + opts['p_misid'] * fsa[:,::-1]
 
