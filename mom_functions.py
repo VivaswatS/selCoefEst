@@ -189,6 +189,36 @@ def run_mom_iterate_changing(n, s, Nc, mu, misc):
 
     return mom[:-1,:]           
 
+def run_mom_iterate_theta_changing(n, s, Nc, theta, misc):
+    mom = np.zeros((len(Nc)+1,n+1),dtype=np.float32)
+    # momnp1 = np.zeros(n+1)
+    momkp1 = np.zeros(n+1,dtype=np.float32)
+
+    dt = 1
+
+    changepoints = len(Nc) - np.concatenate((np.array([0]),np.where(Nc[:-1] != Nc[1:])[0]+1),axis=0)
+    changepoints = np.append(changepoints, 0)
+
+    mom[len(Nc),1] = n*1000/(4*Nc[0]) # singleton input
+    
+    # only need to do this once - no dependence on N
+    J = calcJK13(n)
+    S = 0.5 * s * calcS(n+1, J)
+
+    for i in range(len(changepoints)-1):
+        D = 0.25/Nc[len(Nc)-changepoints[i]] * calcD(n+1)
+
+        slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - 0.5 * (D + S))
+        Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + 0.5 * (D + S)
+
+        for gen in np.arange(changepoints[i+1],changepoints[i])[::-1]:
+            momkp1 = slv(Q.dot(mom[gen+1,]))
+            momkp1[0] = momkp1[n] = 0.0
+
+            mom[gen,] = deepcopy(momkp1)
+
+    return mom[:-1,:] * theta[::-1].reshape(-1,1)/1000
+
 ## creating a log-likelihood function that actually captures the true value using Poisson dist
 def get_lp_xl_pois(pxas, g, sXlred, n=2000, cutoff=2):
     """function to compute L(gamma|Xl), where gamma is a range of values and Xl is a given set of freqs"""
@@ -243,6 +273,19 @@ def get_ll_freqconstant(g, opts, n=2000, cutoff=2):
     fs = moments.LinearSystem_1D.steady_state_1D(2000, gamma=-gamma)
     fs = moments.Spectrum(fs)
     fs.integrate([1], 3, gamma=-gamma, theta=opts['theta']) ## for PReFerSim, we need 0.5Ne instead of Ne
+    fs = fs.project([n]) 
+    fs[fs<0] = -fs[fs<0]
+    
+    fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
+
+    res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
+
+    return -res
+
+def get_ll_freqconstant_notfm(g, opts, n=2000, cutoff=2):
+    fs = moments.LinearSystem_1D.steady_state_1D(2000, gamma=g)
+    fs = moments.Spectrum(fs)
+    fs.integrate([1], 3, gamma=g, theta=opts['theta']) ## for PReFerSim, we need 0.5Ne instead of Ne
     fs = fs.project([n]) 
     fs[fs<0] = -fs[fs<0]
     
@@ -327,22 +370,6 @@ def get_ll_freqagerecconstant(g, opts, n=2000, cutoff=2):
     
     return -res
 
-def get_ll_freqconstantTE(g, opts, n=2000, cutoff=2):
-    gamma = 10**g
-
-    fs = moments.LinearSystem_1D.steady_state_1D(5000, gamma=-gamma)
-    fs = moments.Spectrum(fs)
-    fs.integrate([0.1], 0.25, gamma=-gamma, theta=opts['theta']) 
-    fs.integrate([1], 5, gamma=-gamma, theta=opts['theta'])
-    fs = fs.project([n]) 
-    fs[fs<0] = -fs[fs<0]
-
-    fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
-
-    res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
-
-    return -res
-
 def get_mean_est(g, opts):
     ''' This function was written to check if there was a way to recover the hyperparameter used to simulate
     the expectation (from which we draw the Poisson data). It looks like we can (truth lies within 95% CI). 
@@ -361,6 +388,14 @@ def get_ll_freqageconstant(g, opts, n=2000, cutoff=2):
     gamma = 10**g
 
     fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], opts['theta'], {})[::-1]
+    fsa[fsa<0] = -fsa[fsa<0]
+
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+    
+    return -res
+
+def get_ll_freqageconstant_notfm(g, opts, n=2000, cutoff=2):
+    fsa = run_mom_iterate_constant(opts['gens'], n, g/opts['N'], opts['N'], opts['theta'], {})[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
 
     res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
@@ -393,7 +428,21 @@ def get_ll_freqageconstant_werr(g, opts, n=200,):
 
     return -res
 
-def get_ll_thetaconstant(g, opts, n=200, cutoff=2):
+def get_ll_thetaconstant_freq(g, opts, n=200):
+    """ function to calculate log-lik for single gamma & single theta value with constant pop size """
+    gamma, theta = 10**g
+
+    fs = moments.LinearSystem_1D.steady_state_1D(2000, gamma=-gamma)
+    fs = moments.Spectrum(fs)
+    fs.integrate([1], 3, gamma=-gamma, theta=theta) ## for PReFerSim, we need 0.5Ne instead of Ne
+    fs = fs.project([n]) 
+    fs[fs<0] = -fs[fs<0]
+
+    res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
+
+    return -res
+
+def get_ll_thetaconstant(g, opts, n=200):
     """ function to calculate log-lik for single gamma & single theta value with constant pop size """
     gamma, theta = 10**g
 
@@ -407,6 +456,18 @@ def get_ll_thetaconstant(g, opts, n=200, cutoff=2):
 
     res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
     
+    return -res
+
+def get_ll_thetaconstant_changing(g, opts, n=200):
+    """ function to calculate log-lik for single gamma and two theta values with single changepoint """
+    gamma, theta = 10**g
+    # changept = g[-1]
+
+    fsa = run_mom_iterate_changing(n, -2*gamma/(opts['Nc'][0]/2), opts['Nc']/2, theta, {})[::-1]
+    fsa[fsa<np.min(fsa[fsa>0])] = np.min(fsa[fsa>0])
+
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+
     return -res
 
 def get_ll_theta_bottleneck(g, opts, n=200):
@@ -423,6 +484,20 @@ def get_ll_theta_bottleneck(g, opts, n=200):
 
     return -res
 
+def get_ll_theta_bottleneck_changing(g, opts, n=200):
+    """ function to calculate log-lik for single gamma and two theta values with two unknown changepoints """
+    gamma, theta1, theta2, changept, dur = 10**g
+
+    theta_vec = np.repeat(theta1, opts['sms'].shape[0])
+    theta_vec[int(changept):int(changept + dur)] = theta2
+
+    fsa = run_mom_iterate_theta_changing(n, -2*gamma/(opts['Nc'][0]/2), opts['Nc']/2, theta_vec, {})[::-1]
+    fsa[fsa<np.min(fsa[fsa>0])] = np.min(fsa[fsa>0])
+
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+
+    return -res
+
 def get_ll_theta_twoepoch(g, opts, n=200):
     """ function to calculate log-lik for single gamma and two theta values with single changepoint """
     gamma, theta1, theta2, changept = 10**g
@@ -432,6 +507,36 @@ def get_ll_theta_twoepoch(g, opts, n=200):
     theta_vec[int(changept):] = theta2
 
     fsa = run_mom_iterate_theta(opts['gens'], n, -gamma/opts['N'], opts['N'], theta_vec, {})[::-1]
+    fsa[fsa<0] = -fsa[fsa<0]
+
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+
+    return -res
+
+def get_ll_theta_twoepoch_changing(g, opts, n=200):
+    """ function to calculate log-lik for single gamma and two theta values with single changepoint """
+    gamma, theta1, theta2, changept = 10**g
+    # changept = g[-1]
+
+    theta_vec = np.repeat(theta1, opts['sms'].shape[0])
+    theta_vec[int(changept):] = theta2
+
+    fsa = run_mom_iterate_theta_changing(n, -2*gamma/(opts['Nc'][0]/2), opts['Nc']/2, theta_vec, {})[::-1]
+    fsa[fsa<np.min(fsa[fsa>0])] = np.min(fsa[fsa>0])
+
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+
+    return -res
+
+def get_ll_theta_twoepoch_changing(g, opts, n=200):
+    """ function to calculate log-lik for single gamma and two theta values with single changepoint """
+    gamma, theta1, theta2, changept = 10**g
+    # changept = g[-1]
+
+    theta_vec = np.repeat(theta1, opts['sms'].shape[0])
+    theta_vec[int(changept):] = theta2
+
+    fsa = run_mom_iterate_theta_changing(n, -2*gamma/(opts['Nc'][0]/2), opts['Nc']/2, theta_vec, {})[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
 
     res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
