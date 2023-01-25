@@ -282,6 +282,27 @@ def get_ll_freqconstant(g, opts, n=2000, cutoff=2):
 
     return -res
 
+def get_ll_freqconstant_twogam(g, opts, n=2000, cutoff=2):
+    gamma1, gamma2 = 10**g
+
+    fs1 = moments.LinearSystem_1D.steady_state_1D(2000, gamma=-gamma1)
+    fs1 = moments.Spectrum(fs1)
+    fs1.integrate([1], 3, gamma=-gamma1, theta=opts['theta']) ## for PReFerSim, we need 0.5Ne instead of Ne
+    fs1 = fs1.project([n]) 
+    fs1[fs1<0] = -fs1[fs1<0]
+    
+    fs2 = moments.LinearSystem_1D.steady_state_1D(2000, gamma=-gamma2)
+    fs2 = moments.Spectrum(fs2)
+    fs2.integrate([1], 3, gamma=-gamma2, theta=opts['theta']) ## for PReFerSim, we need 0.5Ne instead of Ne
+    fs2 = fs2.project([n]) 
+    fs2[fs2<0] = -fs2[fs2<0]
+
+    fs = 0.5*fs1 + 0.5*fs2 
+
+    res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
+
+    return -res
+
 def get_ll_freqconstant_notfm(g, opts, n=2000, cutoff=2):
     fs = moments.LinearSystem_1D.steady_state_1D(2000, gamma=g)
     fs = moments.Spectrum(fs)
@@ -394,6 +415,21 @@ def get_ll_freqageconstant(g, opts, n=2000, cutoff=2):
     
     return -res
 
+def get_ll_freqageconstant_twogam(g, opts, n=2000, cutoff=2):
+    gamma1, gamma2 = 10**g
+
+    fsa1 = run_mom_iterate_constant(opts['gens'], n, -gamma1/opts['N'], opts['N'], opts['theta'], {})[::-1]
+    fsa1[fsa1<0] = -fsa1[fsa1<0]
+
+    fsa2 = run_mom_iterate_constant(opts['gens'], n, -gamma2/opts['N'], opts['N'], opts['theta'], {})[::-1]
+    fsa2[fsa2<0] = -fsa2[fsa2<0]
+
+    fsa = 0.5*fsa1 + 0.5*fsa2
+
+    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+    
+    return -res
+
 def get_ll_freqageconstant_notfm(g, opts, n=2000, cutoff=2):
     fsa = run_mom_iterate_constant(opts['gens'], n, g/opts['N'], opts['N'], opts['theta'], {})[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
@@ -459,7 +495,7 @@ def get_ll_thetaconstant(g, opts, n=200):
     return -res
 
 def get_ll_thetaconstant_changing(g, opts, n=200):
-    """ function to calculate log-lik for single gamma and two theta values with single changepoint """
+    """ function to calculate log-lik for single gamma and two theta values with single changepoint & changing pop size """
     gamma, theta = 10**g
     # changept = g[-1]
 

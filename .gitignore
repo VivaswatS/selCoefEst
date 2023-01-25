@@ -2,4 +2,5 @@ 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
 .DS_Store
 PReFerSims/simfiles/*
 testdata/.DS_Store
+PReFerSims/outfiles/*.txt
 .vscode/*
