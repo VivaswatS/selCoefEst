@@ -33,7 +33,7 @@ abline(h=14900,col='red',lty=5)
 legend("topright",pch=c(8,20),legend=c(TeX('$T_{mid}$'),TeX('$min T_{mid},2T_{low}$')))
 
 
-# how does the Relate estimte compare to the heuristic from Simons et al 2022?
+# how does the Relate estimate compare to the heuristic from Simons et al 2022?
 plot(0.5*(rel.out$age_begin+rel.out$age_end),
      pmin(0.5*(rel.out$age_begin+rel.out$age_end),2*rel.out$age_begin),
      col='grey80',pch=20)

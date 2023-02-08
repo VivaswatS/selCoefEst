@@ -549,18 +549,19 @@ def get_ll_theta_twoepoch(g, opts, n=200):
 
     return -res
 
-def get_ll_theta_twoepoch_changing(g, opts, n=200):
-    """ function to calculate log-lik for single gamma and two theta values with single changepoint """
+def get_ll_theta_twoepoch_freq(g, opts, n=200):
+    """ function to calculate log-lik for single gamma and two theta values with single changepoint & SFS """
     gamma, theta1, theta2, changept = 10**g
     # changept = g[-1]
 
     theta_vec = np.repeat(theta1, opts['sms'].shape[0])
     theta_vec[int(changept):] = theta2
 
-    fsa = run_mom_iterate_theta_changing(n, -2*gamma/(opts['Nc'][0]/2), opts['Nc']/2, theta_vec, {})[::-1]
-    fsa[fsa<np.min(fsa[fsa>0])] = np.min(fsa[fsa>0])
+    fsa = run_mom_iterate_theta(opts['gens'], n, -gamma/opts['N'], opts['N'], theta_vec, {})[::-1]
+    fsa[fsa<0] = -fsa[fsa<0]
+    fs = fsa.sum(axis=0)
 
-    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+    res = np.nansum(-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1))
 
     return -res
 
@@ -573,7 +574,7 @@ def get_ll_theta_twoepoch_changing(g, opts, n=200):
     theta_vec[int(changept):] = theta2
 
     fsa = run_mom_iterate_theta_changing(n, -2*gamma/(opts['Nc'][0]/2), opts['Nc']/2, theta_vec, {})[::-1]
-    fsa[fsa<0] = -fsa[fsa<0]
+    fsa[fsa<np.min(fsa[fsa>0])] = np.min(fsa[fsa>0])
 
     res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
 
