@@ -126,10 +126,10 @@ for(al in alleles[,1]){
     ##system(paste0("python3 ../ms2vcf.py ../relfiles/haps",gamma,".0_",al,".ms 200 1000000"))
     system(paste0("Rscript ../ms2vcf2.R ../relfiles/haps",gamma,".0_",al,".ms 1000000"))
     system(paste0("~/geva/geva_v1beta --vcf infiles/haps",gamma,".0_",al,".vcf \\
-                  --out infiles/ingeva",gamma,".0_",al),ignore.stdout=T)
+                  --out infiles/ingeva",gamma,".0_",al))
     system(paste0("~/geva/geva_v1beta -i infiles/ingeva",gamma,".0_",al,".bin -o outfiles/out",gamma,".0_",al," --position 500000 \\
-    --Ne 10000 --mut 1e-8 --hmm ~/geva/hmm/hmm_initial_probs.txt ~/geva/hmm/hmm_emission_probs.txt"),ignore.stdout=T)
-    system(paste0("Rscript ~/geva/estimate.R outfiles/out",gamma,".0_",al,".pairs.txt 10000"),ignore.stdout=T)
+    --Ne 10000 --mut 1e-8 --hmm ~/geva/hmm/hmm_initial_probs.txt ~/geva/hmm/hmm_emission_probs.txt"))
+    system(paste0("Rscript ~/geva/estimate.R outfiles/out",gamma,".0_",al,".pairs.txt 10000"))
     cnt <- cnt+1
 }
 
@@ -160,11 +160,11 @@ plot(rel.true,0.5*(rel.est[,1]+rel.est[,2]),frame=F,log='xy',main=TeX('$\\gamma=
      ylab='est. age',xlab='true age (PReFerSim)',col='grey80',pch=20)
 segments(x0=rel.true,x1=rel.true,y0=rel.est[,1]+1,y1=rel.est[,2],col='grey80')
 points(rel.true,pmin(0.5*(rel.est[,1]+rel.est[,2]),2*rel.est[,1]+1),col='black',pch=20)
-# points(rel.true,geva.est[,2],col='blue',pch=20)
+points(rel.true,geva.est[,2],col='blue',pch=20)
 abline(0,1,col='grey20')
 # abline(485,0.55,col='grey80',lty=2)
-legend("topleft",col=c('grey','black'),bty='n',
-       pch=20,legend=c(TeX('$T_{mid}$'),TeX('$min T_{mid},2T_{low}$')))
+legend("topleft",col=c('grey','black',"blue"),bty='n',
+       pch=20,legend=c(TeX('$T_{mid}$'),TeX('$min T_{mid},2T_{low}$'),'GEVA'))
 
 ## plotting mechanism in which you sort the true ages and plot range on x-axis & (lb,ub) on y-axis
 plot(1:length(alleles[,1]),sort(rel.true),col='red',pch=4,frame=F,log='y',main=TeX('$\\gamma=-10$'),

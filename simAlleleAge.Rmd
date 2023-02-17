@@ -34,7 +34,8 @@ N<-10000 # inds
 # L<-200 
 
 # just pick a grid of values here, say, ~50
-gamma<-c(-exp(log(10)*seq(2, 0, length.out=20)))#,exp(log(10)*seq(-2, 2, length.out=25)))
+# gamma<-c(-exp(log(10)*seq(2, 0, length.out=20)))#,exp(log(10)*seq(-2, 2, length.out=25)))
+gamma<--10
 ```
 
 ## Simulating $X_l$
@@ -73,13 +74,13 @@ estimXl<-function(Xl, gamma, ndraws, cutoff=20, n=2000){
     return(finalXl)
 }
 
-system.time(finalXl<-estimXl(Xl,gamma,ndraws=5000,cutoff=10))
+system.time(finalXl<-estimXl(Xl,gamma,ndraws=10,cutoff=10))
 ```
 
 Now, I have to add an extra column indicating the $\gamma$ value for each row (i.e., frequency). 
 
 ```{r, cache=TRUE}
-finalXl<-cbind(finalXl, rep(gamma,1, each=5000))
+finalXl<-cbind(finalXl, rep(gamma,1, each=10))
 colnames(finalXl)<-c("Xl","gamma")
 ```
 
@@ -183,6 +184,29 @@ using namespace Rcpp;
 
 // [[Rcpp::export]]
 int alleleAgecpp(float X0, float gamma, int N){
+    int gen = 0;
+    double Xt = X0;
+    double mu = 0.0;
+    
+    while(Xt > 0.5/N){
+        gen++;
+        
+        mu = Xt - 0.25*gamma*Xt*(1-Xt)/tanh(0.5*gamma*(1-Xt))/N;
+        Xt = R::rnorm(mu, sqrt(Xt*(1-Xt)*0.5/N));
+    }  
+    
+    return gen;
+}
+```
+
+Creating a Rcpp function for printing out trajectory of the allele given the starting allele freq $X_0$, the population size $N$ and a selection coefficient $\gamma$.
+
+```{Rcpp}
+#include <Rcpp.h>
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+int alleleTrajcpp(float X0, float gamma, int N){
     int gen = 0;
     double Xt = X0;
     double mu = 0.0;

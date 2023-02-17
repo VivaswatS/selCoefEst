@@ -1,0 +1,38 @@
+---
+title: "finalPlots"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(latex2exp)
+setwd('~/selCoefEst/PReFerSims/')
+```
+
+## Plotting final figures
+
+```{r}
+## reading in the data
+parest <- read.csv('parestnotmmdw9Feb23.txt',header=F,sep=' ')
+parestfreq <- matrix(parest[,1],100,50)
+parestage <- matrix(parest[,2],100,50)
+list.of.gamma <- read.csv('gamma_big.txt',header=F)[,1]
+
+colSd <- function (x, na.rm=FALSE) apply(X=x, MARGIN=2, FUN=sd, na.rm=na.rm)
+
+ratio.sd<-colSd(parestfreq)/colSd(parestage)
+```
+
+### Ratio of standard deviations
+
+```{r}
+# plot(-list.of.gamma,ratio.sd,pch=20,frame=F,xlab=TeX('$\\gamma$'),ylab='ratio of SD',log='x',xaxt='n'); grid(); ylim(0.9,1.5); abline(h=1,col='grey80',lty=2); axis(1,at=1:5,labels=10^seq(-2,2,1))
+
+df <- data.frame(gam=-list.of.gamma,rsd=ratio.sd)
+ggplot(df) + geom_point(aes(x=gam,y=rsd)) + theme_bw() + 
+    geom_smooth(aes(x=gam,y=rsd),method='gam',color='grey40',size=1) +
+    scale_x_continuous(trans=scales::pseudo_log_trans(base = 10),breaks=c(0,1,10,100),labels=c(0,1,10,100)) + 
+    geom_hline(yintercept=1., linetype="dashed", color = "grey60") + 
+    labs(x=TeX('$\\gamma$'),y='ratio of SD')
+```
