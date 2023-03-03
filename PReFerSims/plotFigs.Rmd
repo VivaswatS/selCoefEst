@@ -4,17 +4,17 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '~/selCoefEst/PReFerSims/')
 library(ggplot2)
 library(latex2exp)
-setwd('~/selCoefEst/PReFerSims/')
+library(scales)
 ```
 
 ## Plotting final figures
 
 ```{r}
 ## reading in the data
-parest <- read.csv('parestnotmmdw9Feb23.txt',header=F,sep=' ')
+parest <- read.csv('resfiles/parestnotmmdw9Feb23.txt',header=F,sep=' ')
 parestfreq <- matrix(parest[,1],100,50)
 parestage <- matrix(parest[,2],100,50)
 list.of.gamma <- read.csv('gamma_big.txt',header=F)[,1]
@@ -28,11 +28,32 @@ ratio.sd<-colSd(parestfreq)/colSd(parestage)
 
 ```{r}
 # plot(-list.of.gamma,ratio.sd,pch=20,frame=F,xlab=TeX('$\\gamma$'),ylab='ratio of SD',log='x',xaxt='n'); grid(); ylim(0.9,1.5); abline(h=1,col='grey80',lty=2); axis(1,at=1:5,labels=10^seq(-2,2,1))
-
-df <- data.frame(gam=-list.of.gamma,rsd=ratio.sd)
+df <- data.frame(gam=list.of.gamma,rsd=ratio.sd)
+ 
 ggplot(df) + geom_point(aes(x=gam,y=rsd)) + theme_bw() + 
     geom_smooth(aes(x=gam,y=rsd),method='gam',color='grey40',size=1) +
-    scale_x_continuous(trans=scales::pseudo_log_trans(base = 10),breaks=c(0,1,10,100),labels=c(0,1,10,100)) + 
-    geom_hline(yintercept=1., linetype="dashed", color = "grey60") + 
-    labs(x=TeX('$\\gamma$'),y='ratio of SD')
+    scale_x_continuous(trans='pseudo_log',breaks=c(0,-1,-10,-100),labels=c(0,-1,-10,-100)) +
+    geom_hline(yintercept=1., linetype="dashed", color = "grey60", size=1) + 
+    labs(x=TeX('$\\gamma$'),y='ratio of SD') +
+    theme(axis.text=element_text(size=rel(2)),
+        axis.title=element_text(size=rel(1.7),face="bold"))
+```
+
+```{r}
+finalest <- rbind(read.table('resfiles/finalRes2.csv',header=T,sep=','),read.table('resfiles/finalRes2023-03-02.csv',header=T,sep=','))
+
+ta <- t(matrix(finalest$trueage,nrow=20,ncol=50))[,1:19]
+fo <- t(matrix(finalest$freqonly,nrow=20,ncol=50))[,1:19]
+ims <- t(matrix(finalest$impsamp,nrow=20,ncol=50))[,1:19]
+
+df2 <- data.frame(gam=list.of.gamma[1:19],
+                  rtasd=colSd(fo)/colSd(ta), rissd=colSd(fo)/colSd(ims))
+
+ggplot(df2) + geom_point(aes(x=gam,y=rtasd)) + theme_bw() + 
+    geom_smooth(aes(x=gam,y=rtasd),method='gam',color='grey40',size=1) +
+    scale_x_continuous(trans='pseudo_log',breaks=c(0,-1,-10,-100),labels=c(0,-1,-10,-100)) +
+    geom_hline(yintercept=1., linetype="dashed", color = "grey20", size=1) + 
+    labs(x=TeX('$\\gamma$'),y='ratio of SD') +
+    geom_point(aes(x=gam,y=rissd),color='#66c2a5') + theme_bw() +
+    geom_smooth(aes(x=gam,y=rissd),method='gam',fill='#66c2a5',color='#66c2a5',size=1)
 ```
