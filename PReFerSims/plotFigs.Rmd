@@ -5,8 +5,11 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_knit$set(root.dir = '~/selCoefEst/PReFerSims/')
+library(dplyr)
 library(ggplot2)
 library(latex2exp)
+library(RColorBrewer)
+library(ggExtra)
 library(scales)
 ```
 
@@ -17,43 +20,134 @@ library(scales)
 parest <- read.csv('resfiles/parestnotmmdw9Feb23.txt',header=F,sep=' ')
 parestfreq <- matrix(parest[,1],100,50)
 parestage <- matrix(parest[,2],100,50)
-list.of.gamma <- read.csv('gamma_big.txt',header=F)[,1]
+big.gamma <- read.csv('big_gamma.txt',header=F)[,1]
 
 colSd <- function (x, na.rm=FALSE) apply(X=x, MARGIN=2, FUN=sd, na.rm=na.rm)
 
 ratio.sd<-colSd(parestfreq)/colSd(parestage)
+
+# plot(-big.gamma[1:40],(parestfreq[1,1:40] - big.gamma[1:40])*100/big.gamma[1:40],log='x')
 ```
 
 ### Ratio of standard deviations
 
 ```{r}
 # plot(-list.of.gamma,ratio.sd,pch=20,frame=F,xlab=TeX('$\\gamma$'),ylab='ratio of SD',log='x',xaxt='n'); grid(); ylim(0.9,1.5); abline(h=1,col='grey80',lty=2); axis(1,at=1:5,labels=10^seq(-2,2,1))
-df <- data.frame(gam=list.of.gamma,rsd=ratio.sd)
+# df <- data.frame(gam=list.of.gamma,rsd=ratio.sd)
  
-ggplot(df) + geom_point(aes(x=gam,y=rsd)) + theme_bw() + 
+ggplot(df) + geom_point(aes(x=gam,y=rsd)) + theme_bw() +
     geom_smooth(aes(x=gam,y=rsd),method='gam',color='grey40',size=1) +
     scale_x_continuous(trans='pseudo_log',breaks=c(0,-1,-10,-100),labels=c(0,-1,-10,-100)) +
-    geom_hline(yintercept=1., linetype="dashed", color = "grey60", size=1) + 
+    geom_hline(yintercept=1., linetype="dashed", color = "grey60", size=1) +
     labs(x=TeX('$\\gamma$'),y='ratio of SD') +
     theme(axis.text=element_text(size=rel(2)),
         axis.title=element_text(size=rel(1.7),face="bold"))
+
+## reshaping the data into tidyverse format
+df3<-data.frame(tid=rep(rep(1:50,each=100),2),
+                sim=rep(rep(big.gamma,each=100),2),
+                method=c(rep('Freq only',5000),rep('Freq & age',5000)),
+                est=c(parest[,1],parest[,2]))
+
+# df3 %>% dplyr::filter(tid %in% 1:10) %>% ggplot(aes(x=factor(tid),y=est,color=method)) + geom_violin(position='dodge') + 
+#     scale_y_continuous(trans='pseudo_log',breaks=c(0,-1,-10,-100),labels=c(0,-1,-10,-100)) + 
+#     theme_bw()
 ```
 
 ```{r}
-finalest <- rbind(read.table('resfiles/finalRes2.csv',header=T,sep=','),read.table('resfiles/finalRes2023-03-02.csv',header=T,sep=','))
+finalest <- read.table('resfiles/finalResfinal.csv',header=T,sep=',')
+list.of.gamma <- -read.csv('list_of_gammas.txt',header=F)[,1]
 
-ta <- t(matrix(finalest$trueage,nrow=20,ncol=50))[,1:19]
-fo <- t(matrix(finalest$freqonly,nrow=20,ncol=50))[,1:19]
-ims <- t(matrix(finalest$impsamp,nrow=20,ncol=50))[,1:19]
+ta <- t(matrix(finalest$trueage,nrow=20,ncol=100))
+fo <- t(matrix(finalest$freqonly,nrow=20,ncol=100))
+rm <- t(matrix(finalest$relmid,nrow=20,ncol=100))
+ims <- t(matrix(finalest$impsamp,nrow=20,ncol=100))
 
-df2 <- data.frame(gam=list.of.gamma[1:19],
-                  rtasd=colSd(fo)/colSd(ta), rissd=colSd(fo)/colSd(ims))
+df2 <- data.frame(gam=c(big.gamma,list.of.gamma[1:20],-unique(finalest2[,2])),
+                  method=c(rep('Constant, true ages',50),rep('Constant, imp. samp.',20),rep('CEU-like, true age',35)),
+                  val=c(ratio.sd,colSd(fo)/colSd(ims),colSd(parestfreq)/colSd(parestage)))
 
-ggplot(df2) + geom_point(aes(x=gam,y=rtasd)) + theme_bw() + 
-    geom_smooth(aes(x=gam,y=rtasd),method='gam',color='grey40',size=1) +
-    scale_x_continuous(trans='pseudo_log',breaks=c(0,-1,-10,-100),labels=c(0,-1,-10,-100)) +
-    geom_hline(yintercept=1., linetype="dashed", color = "grey20", size=1) + 
+ggplot(df2) + geom_point(aes(x=gam,y=val,color=method,fill=method)) + theme_bw() +
+    geom_smooth(aes(x=gam,y=val,color=method,fill=method),method='loess') +
+    scale_x_continuous(trans='pseudo_log',breaks=c(0,-1,-10,-100),labels=c(0,-1,-10,-100)) + 
+    geom_hline(yintercept=1., linetype="dashed", color = "grey50", size=1) +
     labs(x=TeX('$\\gamma$'),y='ratio of SD') +
-    geom_point(aes(x=gam,y=rissd),color='#66c2a5') + theme_bw() +
-    geom_smooth(aes(x=gam,y=rissd),method='gam',fill='#66c2a5',color='#66c2a5',size=1)
+    guides(color = guide_legend(override.aes = list(fill = "white"))) +
+    theme(axis.text = element_text(size = 12),
+          axis.title = element_text(size = 16),
+          legend.position=c(0.2,0.2))
+
+df4<-data.frame(tid=rep(rep(1:20,each=100),4),
+                sim=rep(rep(list.of.gamma[1:20],each=100),4),
+                method=c(rep('Freq only',2000),rep('Freq & age with true ages',2000),rep('Freq & age with Relate est.',2000),rep('Freq & age with imp. samp.',2000)),
+                est=c(as.vector(fo),as.vector(ta),as.vector(rm),as.vector(ims)))
+
+df4 %>% dplyr::filter(tid %in% c(1,5,9,13,17,20)) %>% dplyr::mutate(xpos=rep(rep(c(1,6,11,14.5,18,20),each=100),4)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_violin(aes(x=xpos,y=est,fill=method),position='dodge',trim=T) +
+    # stat_summary(aes(x=factor(tid),y=est,fill=method),fun.data=mean_sdl, geom="pointrange", color="black",position=position_dodge(width = 1.9),size=0.1) +
+    geom_hline(aes(yintercept=sim),color='grey50',lty=2,size=0.5) + 
+    labs(title="Selection coefficient estimated over 100 replicates",x=TeX('$\\gamma$'), y = TeX('$\\hat{\\gamma}$')) +
+    scale_y_continuous(trans='pseudo_log',breaks=c(0,-1,-10,-100),labels=c(0,-1,-10,-100)) + 
+    scale_x_discrete(breaks=c(1,11,18,20),labels=c(-100,-10,-1,0),limits=1:20) +
+    theme_bw() + theme(axis.text = element_text(size = 12),
+                       axis.title = element_text(size = 16),
+                       legend.key = element_rect(colour="transparent"),
+                       legend.background = element_rect(fill='transparent'),
+                       legend.position=c(0.75,0.25)) +
+    scale_fill_discrete(name="method",labels=c("Freq & age with imp.samp, RMSLE=0.04",
+                                               "Freq & age with Relate est., RMLSE=0.11",
+                                               "Freq & age with true ages, RMSLE=0.01",
+                                               "Freq only, RMLSE=0.02"))
+```
+
+
+```{r}
+freq.age <- read.csv('resfiles/freq_age_est.csv',)[6000:1,]
+
+# R2: -100: 0.1, -10: 0.28, -1: 0.41
+p <- ggplot(freq.age) +
+  geom_point(aes(x = freq, y = age, color = factor(gamma)), shape = 19) +  
+  theme_bw() + scale_color_brewer(palette='Greys',direction=-1,
+                                  name=TeX("$\\gamma$"),
+                         labels=c(TeX('-100, $R^2 \\approx 0.17$'),
+                                  TeX('-10, $R^2 \\approx 0.45$'), 
+                                  TeX('-1, $R^2 \\approx 0.66$'))) + 
+    scale_x_continuous(trans='log10') + scale_y_continuous(trans='log10') +
+  labs(x = "Variant sample freq. (i/400)", y = "Variant age (gens)") +
+    theme(axis.text = element_text(size = 12),
+                       axis.title = element_text(size = 16),
+                        legend.text=element_text(size=12),
+                       legend.key = element_rect(colour="transparent"),
+                       legend.background = element_rect(fill='transparent'),
+                       legend.position=c(0.85,0.25))
+ggMarginal(p, margins='y', type = "density", groupFill = T)
+```
+
+
+```{r}
+library(hdf5r)
+test_filename <- tempfile(fileext = ".h5")
+load('~/Downloads/allele_ages_EUR/allele_ages_FIN.RData')
+file.h5 <- H5File$new(test_filename, mode = "w")
+FIN.grp <- file.h5$create_group("FIN")
+CEU.grp <- file.h5$create_group("CEU")
+FIN.grp[["FIN"]] <- allele_ages
+```
+
+```{r}
+finalest2 <- read.table('resfiles/finalRes2023-03-28.csv',header=T,sep=',')
+
+parestfreq <- t(matrix(finalest2[,4],35,100,byrow=F))
+parestage <- t(matrix(finalest2[,3],35,100,byrow=F))
+big.gamma <- unique(finalest2[,2])
+
+ratio.sd<-colSd(parestfreq)/colSd(parestage)
+
+df <- data.frame(gam=-big.gamma,rsd=ratio.sd)
+ggplot(df) + geom_point(aes(x=gam,y=rsd)) + theme_bw() +
+    geom_smooth(aes(x=gam,y=rsd),method='gam',color='grey40',size=1) +
+    scale_x_continuous(trans='pseudo_log',breaks=c(0,-1,-10,-100),labels=c(0,-1,-10,-100)) +
+    geom_hline(yintercept=1., linetype="dashed", color = "grey60", size=1) +
+    labs(x=TeX('$\\gamma$'),y='ratio of SD') +
+    theme(axis.text=element_text(size=rel(2)),
+        axis.title=element_text(size=rel(1.7),face="bold"))
 ```
