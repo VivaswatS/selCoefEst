@@ -18,6 +18,7 @@ from copy import deepcopy
 # import matplotlib.colors as colors
 import moments
 import warnings
+from numba import njit
 warnings.filterwarnings('error')
 
 # rng setup
@@ -43,7 +44,7 @@ def python2round(f):
 def index_bis(i, n):
     return int(min(max(python2round(i * n / float(n+1)), 2), n-2))
 
-# code borrowed from https://bitbucket.org/simongravel/moments/src/main/moments/Jackknife.pyx  
+# code borrowed from https://bitbucket.org/simongravel/moments/src/main/moments/Jackknife.pyx   
 def calcJK13(n):
     J = np.zeros((n,n-1))
     for i in range(n):
@@ -161,34 +162,66 @@ def calcS2(d, ljk):
 
     return coo_matrix((data, (row, col)), shape=(d, d), dtype='float').tocsc()
 
-# @njit('float64[:,:](int64,float64,float64[:],float64)',parallel=True,cache=True)
+def run_mom_iterate_mom(n, g, nu, gens, theta, sms):
+    mom = np.zeros((gens+1,n+1),dtype=np.float32)
+
+    for i in np.where(sms.sum(axis=1)>0)[0]:
+        fszero = moments.Spectrum(np.zeros(n+1)); fszero[1] = theta
+        fszero.integrate(nu, i/gens, gamma=g, dt_fac=0.0005, theta=0)
+        mom[i,1:-1] = fszero[1:-1]
+
+    return mom
+
+# @njit('float64[:,:](int64,float64,float64[:],float64)',cache=True)
 def run_mom_iterate_changing(n, s, Nc, mu, misc):
     mom = np.zeros((len(Nc)+1,n+1),dtype=np.float32)
     # momnp1 = np.zeros(n+1)
     momkp1 = np.zeros(n+1,dtype=np.float32)
 
-    changepoints = len(Nc) - np.concatenate((np.array([0]),np.where(Nc[:-1] != Nc[1:])[0]+1),axis=0)
-    changepoints = np.append(changepoints, 0)
+    # changepoints = len(Nc) - np.concatenate((np.array([0]),np.where(Nc[:-1] != Nc[1:])[0]+1),axis=0)
+    # changepoints = np.append(changepoints, 1) # 0 instead
 
-    mom[len(Nc),1] = mu # singleton input
+    mom[1,1] = mu*n/(4*Nc[0])  # singleton input
     
     # only need to do this once - no dependence on N
     J = calcJK13(n)
     S = 0.5 * s * calcS(n+1, J)
 
-    for i in range(len(changepoints)-1):
-        D = 0.25/Nc[len(Nc)-changepoints[i]] * calcD(n+1)
+    D = 0.25/Nc[0] * calcD(n+1)
+    slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - 0.5 * (D + S))
+    Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + 0.5 * (D + S)
 
-        slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - 0.5 * (D + S))
-        Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + 0.5 * (D + S)
+    for gen in np.arange(1,len(Nc)):
+        if Nc[gen]!=Nc[gen-1]:
+            D = 0.25/Nc[gen] * calcD(n+1)
 
-        for gen in np.arange(changepoints[i+1],changepoints[i])[::-1]:
-            momkp1 = slv(Q.dot(mom[gen+1,]))
-            momkp1[0] = momkp1[n] = 0.0
+            slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - 0.5 * (D + S))
+            Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + 0.5 * (D + S)
 
-            mom[gen,] = deepcopy(momkp1)
+        momkp1 = slv(Q.dot(mom[gen,]))
+        momkp1[0] = momkp1[n] = 0.0
 
-    return mom[:-1,:]*n/(4*Nc[0])           
+        mom[gen+1,] = deepcopy(momkp1)
+
+    # for i in range(len(changepoints)-1):
+    #     # D = 0.25/Nc[len(Nc)-changepoints[i]] * calcD(n+1)
+    #     D = 0.25/Nc[-changepoints[i]] * calcD(n+1)
+    #     if i>0:
+    #         mom[gen,1] += mu*n/(4*Nc[-changepoints[i]])
+    #         # print('changepoint at gen {}:'.format(gen))
+
+    #     slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - 0.5 * (D + S))
+    #     Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + 0.5 * (D + S)
+
+    #     for gen in np.arange(changepoints[i+1]+1,changepoints[i])[::-1]:
+    #         momkp1 = slv(Q.dot(mom[gen+1,]))
+    #         momkp1[0] = momkp1[n] = 0.0
+
+    #         mom[gen,] = deepcopy(momkp1)
+    #         # print('gen {}:'.format(gen))
+    #         # print(mom[gen,])
+
+    return mom[:-1,:]      
 
 def run_mom_iterate_theta_changing(n, s, Nc, theta, misc):
     mom = np.zeros((len(Nc)+1,n+1),dtype=np.float32)
@@ -241,27 +274,27 @@ def get_lp_xl_bin(pxas, g, sXlred, n=2000, cutoff=2):
     return res
 
 def get_ll_freqdemchanging(s, opts, n=200,):
-    selcoef = 0.5*s
+    selcoef = s
 
-    fs = moments.LinearSystem_1D.steady_state_1D(2000, gamma=selcoef)
+    fs = moments.LinearSystem_1D.steady_state_1D(8000, gamma=selcoef, theta=opts['theta'])
     fs = moments.Spectrum(fs)
-    fs.integrate(opts['nu'], opts['T'], gamma=selcoef, dt_fac=0.0005, theta=opts['theta'])
+    fs.integrate(opts['nu'], opts['T'], gamma=selcoef, dt_fac=1e-3, theta=opts['theta'])
     fs = fs.project([n]) 
     fs[fs<0] = 0
 
-    res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
+    # res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
+    res = np.abs(np.sum(moments.Inference.Anscombe_Poisson_residual(fs, opts['sfs'])))
 
-    return -res
+    return res
 
 def get_ll_freqagedemchanging(s, opts, n=200):
     # fsa = run_mom_iterate_changing(n, 0.5*s/(opts['Nc'][0]/2), opts['Nc']/2, opts['theta'], {})[::-1]
-    fsa = run_mom_iterate_changing(n, 0.5*s/opts['Nc'][0], opts['Nc'], opts['theta'], {})[::-1]
+    fsa = run_mom_iterate_changing(n, s/opts['Nc'][0], opts['Nc'], opts['theta'], {}) 
     fsa[fsa<0] = 0
 
-    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+    res = np.nansum(-fsa[1:,1:] + np.log(fsa[1:,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
 
     return -res
-
 
 def get_ll_freqconstant(g, opts, n=2000, cutoff=2):
     gamma = 10**g
@@ -299,7 +332,7 @@ def get_ll_freqconstant_twogam(g, opts, n=2000, cutoff=2):
 
     return -res
 
-def get_ll_freqconstant_notfm(g, opts, n=2000, cutoff=2):
+def get_ll_freqconstant_notfm(g, opts, n=2000, cutoff=1):
     fs = moments.LinearSystem_1D.steady_state_1D(2000, gamma=g)
     fs = moments.Spectrum(fs)
     fs.integrate([1], 3, gamma=g, theta=opts['theta']) ## for PReFerSim, we need 0.5Ne instead of Ne
@@ -308,7 +341,7 @@ def get_ll_freqconstant_notfm(g, opts, n=2000, cutoff=2):
     
     fs = (1 - opts['p_misid']) * fs + opts['p_misid'] * fs[::-1]
 
-    res = (-fs + np.log(fs) * opts['sfs'] - sp.special.gammaln(opts['sfs']+1)).sum()
+    res = (-fs[cutoff:(n-cutoff+1)] + np.log(fs[cutoff:(n-cutoff+1)]) * opts['sfs'][cutoff:(n-cutoff+1)] - sp.special.gammaln(opts['sfs'][cutoff:(n-cutoff+1)]+1)).sum()
 
     return -res
 
@@ -426,11 +459,11 @@ def get_ll_freqageconstant_twogam(g, opts, n=2000, cutoff=2):
     
     return -res
 
-def get_ll_freqageconstant_notfm(g, opts, n=2000, cutoff=2):
+def get_ll_freqageconstant_notfm(g, opts, n=2000, cutoff=1):
     fsa = run_mom_iterate_constant(opts['gens'], n, g/opts['N'], opts['N'], opts['theta'], {})[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
 
-    res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
+    res = np.nansum(-fsa[:-1,cutoff:(n-cutoff+1)] + np.log(fsa[:-1,cutoff:(n-cutoff+1)]) * opts['sms'][1:,cutoff:(n-cutoff+1)] - sp.special.gammaln(opts['sms'][1:,cutoff:(n-cutoff+1)]+1))
     
     return -res
 
@@ -620,8 +653,8 @@ def run_mom_iterate_constant(a, n, s, N, theta, misc):
 
     dt = 1
 
-    D = 0.25/N * calcD(n+1)
     J = calcJK13(n)
+    D = 0.25/N * calcD(n+1)
     S = 0.5 * s * calcS(n+1, J)
 
     # if N is same across all gens then only have to do this once

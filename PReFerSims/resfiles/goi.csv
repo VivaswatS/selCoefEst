@@ -1,0 +1,136 @@
+gam,method,val
+-100,Using true ages (constant),1.52129968661324
+-89.1250938133745,Using true ages (constant),1.5665993198582
+-79.4328234724281,Using true ages (constant),1.62431552167689
+-70.7945784384138,Using true ages (constant),1.60921739993615
+-63.0957344480193,Using true ages (constant),1.47944956244836
+-56.2341325190349,Using true ages (constant),1.36922816128733
+-50.1187233627272,Using true ages (constant),1.71247084800382
+-44.6683592150963,Using true ages (constant),1.54635435956233
+-39.8107170553497,Using true ages (constant),1.54686475078666
+-35.4813389233575,Using true ages (constant),1.54321484227137
+-31.6227766016838,Using true ages (constant),1.54917151385055
+-28.1838293126445,Using true ages (constant),1.68901758387262
+-25.1188643150958,Using true ages (constant),1.59638214792825
+-22.3872113856834,Using true ages (constant),1.72639912196503
+-19.9526231496888,Using true ages (constant),1.16880305062365
+-17.7827941003892,Using true ages (constant),1.48730876376452
+-15.8489319246111,Using true ages (constant),1.19349639658365
+-14.1253754462275,Using true ages (constant),1.40792138942006
+-12.5892541179417,Using true ages (constant),2.04247257634775
+-11.2201845430196,Using true ages (constant),1.59847948222745
+-10,Using true ages (constant),1.53914303239049
+-8.91250938133745,Using true ages (constant),1.29015952233917
+-7.94328234724281,Using true ages (constant),1.2930740439303
+-7.07945784384138,Using true ages (constant),1.65972740078658
+-6.30957344480193,Using true ages (constant),1.32155285796557
+-5.62341325190349,Using true ages (constant),1.42286616310541
+-5.01187233627272,Using true ages (constant),1.50250076322105
+-4.46683592150963,Using true ages (constant),1.54162715682749
+-3.98107170553497,Using true ages (constant),1.22030435196285
+-3.54813389233575,Using true ages (constant),1.22583374614008
+-3.16227766016838,Using true ages (constant),1.18316804607624
+-2.81838293126445,Using true ages (constant),1.46343469432436
+-2.51188643150958,Using true ages (constant),1.32104468342492
+-2.23872113856834,Using true ages (constant),1.28047618117304
+-1.99526231496888,Using true ages (constant),1.22502346738016
+-1.77827941003892,Using true ages (constant),1.24027926284815
+-1.58489319246111,Using true ages (constant),1.18083462425679
+-1.41253754462275,Using true ages (constant),1.21223891648784
+-1.25892541179417,Using true ages (constant),1.19439233265688
+-1.12201845430196,Using true ages (constant),1.3247072304232
+-1,Using true ages (constant),1.091828755632
+-0.726027427804812,Using true ages (constant),1.21236861904568
+-0.50502697079121,Using true ages (constant),1.14866769782284
+-0.332150056274944,Using true ages (constant),1.14946109984461
+-0.20234728801143,Using true ages (constant),1.12765853090458
+-0.110323659883449,Using true ages (constant),1.09593899678432
+-0.0504719359563875,Using true ages (constant),1.11868953693183
+-0.0167642563682195,Using true ages (constant),1.14026159436716
+-0.00254741631918568,Using true ages (constant),1.0689769126106
+0,Using true ages (constant),1.08520382175384
+100,Using true ages (constant),7310.41547030005
+74.9894209332456,Using true ages (constant),18536.023898157
+56.2341325190349,Using true ages (constant),1611.68305645162
+42.1696503428582,Using true ages (constant),436.171968841475
+31.6227766016838,Using true ages (constant),194.733229319103
+23.7137370566166,Using true ages (constant),114.338654193609
+17.7827941003892,Using true ages (constant),140.952593586172
+13.3352143216332,Using true ages (constant),89.4441498796811
+10,Using true ages (constant),54.4468175213699
+7.49894209332456,Using true ages (constant),31.2456876829706
+5.62341325190349,Using true ages (constant),14.2926235335599
+4.21696503428582,Using true ages (constant),8.60936716544873
+3.16227766016838,Using true ages (constant),3.7811369427007
+2.37137370566166,Using true ages (constant),1.5346903255981
+1.77827941003892,Using true ages (constant),1.01656716157078
+1.33352143216332,Using true ages (constant),0.911377088319144
+1,Using true ages (constant),0.814938538701306
+0.332,Using true ages (constant),0.831545572683097
+0.05,Using true ages (constant),0.814689708980192
+0,Using true ages (constant),0.802504788179122
+-100,Using Relate est. ages with imp. samp.,1.0628841250835
+-74.989,Using Relate est. ages with imp. samp.,1.05091469509996
+-56.423,Using Relate est. ages with imp. samp.,1.06469367758493
+-42.17,Using Relate est. ages with imp. samp.,1.11440541730384
+-31.623,Using Relate est. ages with imp. samp.,1.1088639264202
+-23.714,Using Relate est. ages with imp. samp.,1.06613726427381
+-17.783,Using Relate est. ages with imp. samp.,1.05071121329631
+-13.335,Using Relate est. ages with imp. samp.,1.02018015765299
+-10,Using Relate est. ages with imp. samp.,1.08414964089737
+-7.499,Using Relate est. ages with imp. samp.,1.04895817632759
+-5.623,Using Relate est. ages with imp. samp.,1.01091215764882
+-4.217,Using Relate est. ages with imp. samp.,1.0873767482663
+-3.162,Using Relate est. ages with imp. samp.,1.00164977044076
+-2.371,Using Relate est. ages with imp. samp.,0.961968361285754
+-1.778,Using Relate est. ages with imp. samp.,0.999910161580471
+-1.334,Using Relate est. ages with imp. samp.,0.980907899095577
+-1,Using Relate est. ages with imp. samp.,0.988962775829556
+-0.332,Using Relate est. ages with imp. samp.,0.843617169036365
+-0.005,Using Relate est. ages with imp. samp.,0.768492267712893
+0,Using Relate est. ages with imp. samp.,0.746357480327311
+-100,Using true ages (AFR-like),2.94737877260896
+-85.77,Using true ages (AFR-like),2.00434231457462
+-73.564,Using true ages (AFR-like),3.12877110709866
+-63.096,Using true ages (AFR-like),4.75315948138173
+-54.117,Using true ages (AFR-like),2.78670348657997
+-46.416,Using true ages (AFR-like),3.59340181842494
+-39.811,Using true ages (AFR-like),2.19372320726822
+-34.145,Using true ages (AFR-like),3.51922450322487
+-29.286,Using true ages (AFR-like),4.1747526888578
+-25.119,Using true ages (AFR-like),2.41199888844029
+-21.544,Using true ages (AFR-like),2.83277590271891
+-18.478,Using true ages (AFR-like),2.4677290079987
+-15.849,Using true ages (AFR-like),2.81649093955634
+-13.594,Using true ages (AFR-like),2.90462671377188
+-11.659,Using true ages (AFR-like),2.37665545485988
+-10,Using true ages (AFR-like),1.59299794685207
+-8.577,Using true ages (AFR-like),2.14173916138939
+-7.356,Using true ages (AFR-like),1.89115248647261
+-6.31,Using true ages (AFR-like),1.49865591214525
+-5.412,Using true ages (AFR-like),1.57371320599954
+-4.642,Using true ages (AFR-like),1.97500510394087
+-3.981,Using true ages (AFR-like),1.15778488352329
+-3.415,Using true ages (AFR-like),1.88280369286675
+-2.929,Using true ages (AFR-like),1.29261542809844
+-2.512,Using true ages (AFR-like),1.2434083664433
+-2.154,Using true ages (AFR-like),1.41389964834759
+-1.848,Using true ages (AFR-like),3.00479155398478
+-1.585,Using true ages (AFR-like),1.80251413855318
+-1.359,Using true ages (AFR-like),1.35845993692982
+-1.166,Using true ages (AFR-like),1.08605930481477
+-1,Using true ages (AFR-like),1.15844141251696
+-0.457,Using true ages (AFR-like),1.11799635598131
+-0.152,Using true ages (AFR-like),1.35906014412151
+-0.023,Using true ages (AFR-like),1.01065443252389
+0,Using true ages (AFR-like),0.966282204206018
+100,Using true ages (AFR-like),2320.1953198
+46.4158883361278,Using true ages (AFR-like),245.560773712321
+21.5443469003188,Using true ages (AFR-like),69.6224185490809
+10,Using true ages (AFR-like),20.0330382664766
+4.64158883361278,Using true ages (AFR-like),4.11381275781389
+2.15443469003188,Using true ages (AFR-like),1.21367484487789
+1,Using true ages (AFR-like),0.99844775650883
+0.464158883361278,Using true ages (AFR-like),0.930917843800636
+0.215443469003188,Using true ages (AFR-like),0.97469681638269
+0.1,Using true ages (AFR-like),1.10426034130521
