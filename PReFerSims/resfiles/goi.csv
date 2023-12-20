@@ -69,26 +69,26 @@ gam,method,val
 0.332,Using true ages (constant),0.831545572683097
 0.05,Using true ages (constant),0.814689708980192
 0,Using true ages (constant),0.802504788179122
--100,Using Relate est. ages with imp. samp.,1.0628841250835
--74.989,Using Relate est. ages with imp. samp.,1.05091469509996
--56.423,Using Relate est. ages with imp. samp.,1.06469367758493
--42.17,Using Relate est. ages with imp. samp.,1.11440541730384
--31.623,Using Relate est. ages with imp. samp.,1.1088639264202
--23.714,Using Relate est. ages with imp. samp.,1.06613726427381
--17.783,Using Relate est. ages with imp. samp.,1.05071121329631
--13.335,Using Relate est. ages with imp. samp.,1.02018015765299
--10,Using Relate est. ages with imp. samp.,1.08414964089737
--7.499,Using Relate est. ages with imp. samp.,1.04895817632759
--5.623,Using Relate est. ages with imp. samp.,1.01091215764882
--4.217,Using Relate est. ages with imp. samp.,1.0873767482663
--3.162,Using Relate est. ages with imp. samp.,1.00164977044076
--2.371,Using Relate est. ages with imp. samp.,0.961968361285754
--1.778,Using Relate est. ages with imp. samp.,0.999910161580471
--1.334,Using Relate est. ages with imp. samp.,0.980907899095577
--1,Using Relate est. ages with imp. samp.,0.988962775829556
--0.332,Using Relate est. ages with imp. samp.,0.843617169036365
--0.005,Using Relate est. ages with imp. samp.,0.768492267712893
-0,Using Relate est. ages with imp. samp.,0.746357480327311
+-100,Using Relate est. ages with branch avg.,1.0628841250835
+-74.989,Using Relate est. ages with branch avg.,1.05091469509996
+-56.423,Using Relate est. ages with branch avg.,1.06469367758493
+-42.17,Using Relate est. ages with branch avg.,1.11440541730384
+-31.623,Using Relate est. ages with branch avg.,1.1088639264202
+-23.714,Using Relate est. ages with branch avg.,1.06613726427381
+-17.783,Using Relate est. ages with branch avg.,1.05071121329631
+-13.335,Using Relate est. ages with branch avg.,1.02018015765299
+-10,Using Relate est. ages with branch avg.,1.08414964089737
+-7.499,Using Relate est. ages with branch avg.,1.04895817632759
+-5.623,Using Relate est. ages with branch avg.,1.01091215764882
+-4.217,Using Relate est. ages with branch avg.,1.0873767482663
+-3.162,Using Relate est. ages with branch avg.,1.00164977044076
+-2.371,Using Relate est. ages with branch avg.,0.961968361285754
+-1.778,Using Relate est. ages with branch avg.,0.999910161580471
+-1.334,Using Relate est. ages with branch avg.,0.980907899095577
+-1,Using Relate est. ages with branch avg.,0.988962775829556
+-0.332,Using Relate est. ages with branch avg.,0.843617169036365
+-0.005,Using Relate est. ages with branch avg.,0.768492267712893
+0,Using Relate est. ages with branch avg.,0.746357480327311
 -100,Using true ages (AFR-like),2.94737877260896
 -85.77,Using true ages (AFR-like),2.00434231457462
 -73.564,Using true ages (AFR-like),3.12877110709866

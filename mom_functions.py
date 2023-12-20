@@ -173,7 +173,7 @@ def run_mom_iterate_mom(n, g, nu, gens, theta, sms):
     return mom
 
 # @njit('float64[:,:](int64,float64,float64[:],float64)',cache=True)
-def run_mom_iterate_changing(n, s, Nc, mu, misc):
+def run_mom_iterate_changing(n, s, Nc, mu):
     mom = np.zeros((len(Nc),n+1),dtype=np.float32)
     # momnp1 = np.zeros(n+1)
     momkp1 = np.zeros(n+1,dtype=np.float32)
@@ -225,7 +225,7 @@ def run_mom_iterate_changing(n, s, Nc, mu, misc):
 
     return mom[::-1][:-1,:]      
 
-def run_mom_iterate_changing2(n, s, Nc, theta, misc):
+def run_mom_iterate_changing2(n, s, Nc, theta):
     # mom[a,:] is the SFS for alleles that arose a gens ago
     mom = np.zeros((len(Nc),n+1),dtype=np.float32)
     momkp1 = np.zeros(n+1,dtype=np.float32)
@@ -331,7 +331,7 @@ def run_mom_iterate_changing2(n, s, Nc, theta, misc):
 
 #     return mom[::-1]#[:-1,:]
 
-def run_mom_iterate_changing3(n, s, Nc, theta, misc):
+def run_mom_iterate_changing3(n, s, Nc, theta):
     """function computing the moments equations using matrix of probability transitions isntead of iterating through generations"""
     mom = np.zeros((len(Nc)+1,n+1),dtype=np.float32)
 
@@ -373,6 +373,7 @@ def run_mom_iterate_changing3(n, s, Nc, theta, misc):
         # (if gen is in the most recent epoch, then run for gen gens, otherwise for (gen - next epoch) gens)
         probmat = np.linalg.matrix_power(probdict[changepoints[whichep]],gen-changepoints[whichep]) @ initvec
         # run this loop from whichep to the most recent epoch (going forwards in time)
+        ## can optimize here by storing the transition matrix at each gen in a different object so no raising to power (try it?)
         for iep in np.arange(0,whichep)[::-1]:
             probmat = superprobdict[changepoints[iep]] @ probmat
         # manually do the operation for the last epoch (iep=0) since changepoints[-1] doesn't exist 
@@ -381,15 +382,79 @@ def run_mom_iterate_changing3(n, s, Nc, theta, misc):
         #     probmat = np.linalg.matrix_power(probdict[changepoints[0]],changepoints[1]-changepoints[0]) @ probmat
         
         mom[gen,] = probmat 
-        mom[gen,0] = 0; mom[gen,n] = 0
 
         if gen*100/len(Nc)%20 == 0 and gen/len(Nc) < 1:
             print('{:d}%'.format(int(gen*100/len(Nc))), end='...')
     print('done!')
+    mom[:,0] = 0; mom[:,n] = 0
 
     return mom#[:-1,:]
 
-def run_mom_iterate_theta_changing(n, s, Nc, theta, misc):
+# FASTER VERSION OF ABOVE FUNCTION (~10x speed-up)
+def run_mom_iterate_changing4(n, s, Nc, theta):
+    """function computing the moments equations using matrix of probability transitions instead of iterating through generations"""
+    mom = np.zeros((len(Nc)+1,n+1),dtype=np.float32)
+
+    probmat = np.zeros((n+1,n+1))
+    probvec = np.zeros(n+1)
+    probdict = {}
+    superprobdict = {}
+
+    # contains the generations, counting from len(Nc), at which population size changes 
+    # (so if pop size changes 100 gens ago & we track 500 gens, then changepoints = [500, 401])
+    changepoints = np.concatenate((np.array([1]),np.where(Nc[:-1] != Nc[1:])[0]+1),axis=0)  
+
+    # only need to do this once - no dependence on N
+    J = calcJK13(n)
+    S = 0.5 * s * calcS(n+1, J)
+
+    print('Constructing probability transition matrices for each epoch',end='...')
+    
+    # creating a list of probability transition matrices for each 'epoch' (starting from the last 'epoch' and working forwards)
+    for iep, ep in enumerate(changepoints):
+        D = 0.25/Nc[ep] * calcD(n+1)
+        # forward &  backward steps for stabilty
+        slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - 0.5 * (D + S))
+        Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + 0.5 * (D + S)
+        # creating the probability transition matrix for each 'epoch'
+        # probdict[ep] = sp.sparse.csr_matrix(slv(Q.toarray())) 
+        probdict[ep] = slv(Q.toarray())
+        # initvec[ep] = sp.sparse.csr_array([0]+[n*theta/(4*Nc[ep])]+[0]*(n-1)).T
+        # contains the matrix powers for the whole epoch (saves you the time for calculating them later)
+        # superprobdict[ep] = np.linalg.matrix_power(probdict[ep],np.append(changepoints,len(Nc))[iep+1]-changepoints[iep])
+    
+    initvec = np.array([0]+[n*0.25*theta]+[0]*(n-1))
+    
+    print('done!\n Starting SFAS construction: ')
+
+    probvec = probdict[changepoints[0]]
+    mom[1,] = probvec @ initvec
+    mom[1,0] = 0; mom[1,n] = 0
+
+    for gen in np.arange(2,len(Nc)+1):
+        # indicator for which prob transition matrix to use (should be the oldest one that is still younger than the current gen)
+        whichep = np.max(np.where(changepoints-gen<=0)[0]) # will throw an error if it exceeds the oldest gen
+        # raise the probability transition matrix to the right power
+        # (if gen is in the most recent epoch, then run for gen gens, otherwise for (gen - next epoch) gens)
+        probvec = probvec @ probdict[changepoints[whichep]]
+        mom[gen,] = probvec @ initvec
+        # run this loop from whichep to the most recent epoch (going forwards in time)
+        ## can optimize here by storing the transition matrix at each gen in a different object so no raising to power (try it?)
+        # for iep in np.arange(0,whichep)[::-1]:
+        #     probmat = superprobdict[changepoints[iep]] @ probmat
+        # manually do the operation for the last epoch (iep=0) since changepoints[-1] doesn't exist 
+        # (can skip this step since it's included in the previous operation)
+        # if whichep>=1:
+        #     probmat = np.linalg.matrix_power(probdict[changepoints[0]],changepoints[1]-changepoints[0]) @ probmat
+        
+        if gen*100/len(Nc)%20 == 0 and gen/len(Nc) < 1:
+            print('{:d}%'.format(int(gen*100/len(Nc))), end='...')
+    print('done!')
+    mom[:,0] = 0; mom[:,n] = 0
+
+    return mom#[:-1,:]
+
+def run_mom_iterate_theta_changing(n, s, Nc, theta):
     mom = np.zeros((len(Nc)+1,n+1),dtype=np.float32)
     # momnp1 = np.zeros(n+1)
     momkp1 = np.zeros(n+1,dtype=np.float32)
@@ -454,8 +519,8 @@ def get_ll_freqdemchanging(s, opts, n=200,):
     return res
 
 def get_ll_freqagedemchanging(s, opts, n=200):
-    # fsa = run_mom_iterate_changing(n, 0.5*s/(opts['Nc'][0]/2), opts['Nc']/2, opts['theta'], {})[::-1]
-    fsa = run_mom_iterate_changing(n, s/opts['Nc'][0], opts['Nc'], opts['theta'], {}) 
+    # fsa = run_mom_iterate_changing(n, 0.5*s/(opts['Nc'][0]/2), opts['Nc']/2, opts['theta'] )[::-1]
+    fsa = run_mom_iterate_changing(n, s/opts['Nc'][0], opts['Nc'], opts['theta'] ) 
     fsa[fsa<0] = 0
 
     res = np.nansum(-fsa[1:,1:] + np.log(fsa[1:,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
@@ -463,8 +528,8 @@ def get_ll_freqagedemchanging(s, opts, n=200):
     return -res
 
 def get_ll_freqagedemchanging2(s, opts, n=200):
-    # fsa = run_mom_iterate_changing(n, 0.5*s/(opts['Nc'][0]/2), opts['Nc']/2, opts['theta'], {})[::-1]
-    fsa = run_mom_iterate_changing2(n, s/opts['Nc'][0], opts['Nc'], opts['theta'], {}) 
+    # fsa = run_mom_iterate_changing(n, 0.5*s/(opts['Nc'][0]/2), opts['Nc']/2, opts['theta'] )[::-1]
+    fsa = run_mom_iterate_changing2(n, s/opts['Nc'][0], opts['Nc'], opts['theta'] ) 
     fsa[fsa<0] = 0
 
     res = np.nansum(-fsa[1:,1:] + np.log(fsa[1:,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
@@ -612,7 +677,7 @@ def get_mean_est(g, opts):
 def get_ll_freqageconstant(g, opts, n=2000, cutoff=2):
     gamma = 10**g
 
-    fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], opts['theta'], {})[::-1]
+    fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], opts['theta'])[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
 
     res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
@@ -622,10 +687,10 @@ def get_ll_freqageconstant(g, opts, n=2000, cutoff=2):
 def get_ll_freqageconstant_twogam(g, opts, n=2000, cutoff=2):
     gamma1, gamma2 = 10**g
 
-    fsa1 = run_mom_iterate_constant(opts['gens'], n, -gamma1/opts['N'], opts['N'], opts['theta'], {})[::-1]
+    fsa1 = run_mom_iterate_constant(opts['gens'], n, -gamma1/opts['N'], opts['N'], opts['theta'])[::-1]
     fsa1[fsa1<0] = -fsa1[fsa1<0]
 
-    fsa2 = run_mom_iterate_constant(opts['gens'], n, -gamma2/opts['N'], opts['N'], opts['theta'], {})[::-1]
+    fsa2 = run_mom_iterate_constant(opts['gens'], n, -gamma2/opts['N'], opts['N'], opts['theta'] )[::-1]
     fsa2[fsa2<0] = -fsa2[fsa2<0]
 
     fsa = 0.5*fsa1 + 0.5*fsa2
@@ -635,7 +700,7 @@ def get_ll_freqageconstant_twogam(g, opts, n=2000, cutoff=2):
     return -res
 
 def get_ll_freqageconstant_notfm(g, opts, n=2000, cutoff=1):
-    fsa = run_mom_iterate_constant(opts['gens'], n, g/opts['N'], opts['N'], opts['theta'], {})[::-1]
+    fsa = run_mom_iterate_constant(opts['gens'], n, g/opts['N'], opts['N'], opts['theta'] )[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
 
     res = np.nansum(-fsa[:-1,cutoff:(n-cutoff+1)] + np.log(fsa[:-1,cutoff:(n-cutoff+1)]) * opts['sms'][1:,cutoff:(n-cutoff+1)] - sp.special.gammaln(opts['sms'][1:,cutoff:(n-cutoff+1)]+1))
@@ -645,7 +710,7 @@ def get_ll_freqageconstant_notfm(g, opts, n=2000, cutoff=1):
 def get_ll_freqageconstant_werr(g, opts, n=200,):
     gamma = 10**g
 
-    fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], opts['theta'], {})[::-1]
+    fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], opts['theta'] )[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
 
     # get log-lik from the bins with NO data
@@ -686,7 +751,7 @@ def get_ll_thetaconstant(g, opts, n=200):
     """ function to calculate log-lik for single gamma & single theta value with constant pop size """
     gamma, theta = 10**g
 
-    fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], theta, {})[::-1]
+    fsa = run_mom_iterate_constant(opts['gens'], n, -gamma/opts['N'], opts['N'], theta )[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
 
     # to ensure that there is no -inf when taking log
@@ -703,7 +768,7 @@ def get_ll_thetaconstant_changing(g, opts, n=200):
     gamma, theta = 10**g
     # changept = g[-1]
 
-    fsa = run_mom_iterate_changing(n, -2*gamma/(opts['Nc'][0]/2), opts['Nc']/2, theta, {})[::-1]
+    fsa = run_mom_iterate_changing(n, -2*gamma/(opts['Nc'][0]/2), opts['Nc']/2, theta )[::-1]
     fsa[fsa<np.min(fsa[fsa>0])] = np.min(fsa[fsa>0])
 
     res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
@@ -717,7 +782,7 @@ def get_ll_theta_bottleneck(g, opts, n=200):
     theta_vec = np.repeat(theta1, opts['sms'].shape[0])
     theta_vec[int(changept):int(changept + dur)] = theta2
 
-    fsa = run_mom_iterate_theta(opts['gens'], n, -gamma/opts['N'], opts['N'], theta_vec, {})[::-1]
+    fsa = run_mom_iterate_theta(opts['gens'], n, -gamma/opts['N'], opts['N'], theta_vec )[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
 
     res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
@@ -731,7 +796,7 @@ def get_ll_theta_bottleneck_changing(g, opts, n=200):
     theta_vec = np.repeat(theta1, opts['sms'].shape[0])
     theta_vec[int(changept):int(changept + dur)] = theta2
 
-    fsa = run_mom_iterate_theta_changing(n, -2*gamma/(opts['Nc'][0]/2), opts['Nc']/2, theta_vec, {})[::-1]
+    fsa = run_mom_iterate_theta_changing(n, -2*gamma/(opts['Nc'][0]/2), opts['Nc']/2, theta_vec )[::-1]
     fsa[fsa<np.min(fsa[fsa>0])] = np.min(fsa[fsa>0])
 
     res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
@@ -746,7 +811,7 @@ def get_ll_theta_twoepoch(g, opts, n=200):
     theta_vec = np.repeat(theta1, opts['sms'].shape[0])
     theta_vec[int(changept):] = theta2
 
-    fsa = run_mom_iterate_theta(opts['gens'], n, -gamma/opts['N'], opts['N'], theta_vec, {})[::-1]
+    fsa = run_mom_iterate_theta(opts['gens'], n, -gamma/opts['N'], opts['N'], theta_vec )[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
 
     res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
@@ -761,7 +826,7 @@ def get_ll_theta_twoepoch_freq(g, opts, n=200):
     theta_vec = np.repeat(theta1, opts['sms'].shape[0])
     theta_vec[int(changept):] = theta2
 
-    fsa = run_mom_iterate_theta(opts['gens'], n, -gamma/opts['N'], opts['N'], theta_vec, {})[::-1]
+    fsa = run_mom_iterate_theta(opts['gens'], n, -gamma/opts['N'], opts['N'], theta_vec )[::-1]
     fsa[fsa<0] = -fsa[fsa<0]
     fs = fsa.sum(axis=0)
 
@@ -777,7 +842,7 @@ def get_ll_theta_twoepoch_changing(g, opts, n=200):
     theta_vec = np.repeat(theta1, opts['sms'].shape[0])
     theta_vec[int(changept):] = theta2
 
-    fsa = run_mom_iterate_theta_changing(n, -2*gamma/(opts['Nc'][0]/2), opts['Nc']/2, theta_vec, {})[::-1]
+    fsa = run_mom_iterate_theta_changing(n, -2*gamma/(opts['Nc'][0]/2), opts['Nc']/2, theta_vec )[::-1]
     fsa[fsa<np.min(fsa[fsa>0])] = np.min(fsa[fsa>0])
 
     res = np.nansum(-fsa[:-1,1:] + np.log(fsa[:-1,1:]) * opts['sms'][1:,1:] - sp.special.gammaln(opts['sms'][1:,1:]+1))
@@ -821,7 +886,7 @@ def get_ll_freqagechanging(g, opts, n=1000, cutoff=2):
 ## packaging into a function for easy manipulation - iteration implementation 
 # input: a (number of gens), n (number of samples), s, N (pop size)
 # output: mom (number of sites)
-def run_mom_iterate_constant(a, n, s, N, theta, misc):
+def run_mom_iterate_constant(a, n, s, N, theta):
     mom = np.zeros((a+1,n+1),dtype=np.float32)
     # momnp1 = np.zeros(n+1)
     momkp1 = np.zeros(n+1,dtype=np.float32)
@@ -875,7 +940,7 @@ def run_mom_iterate_constantrec(a, n, s, N, theta, h):
 
     return mom[:-1,:]       
 
-def run_mom_iterate_theta(a, n, s, N, theta, misc):
+def run_mom_iterate_theta(a, n, s, N, theta):
     # assert a == len(theta), "length of mutation rate should be equal to number of gens"
     mom = np.zeros((a+1,n+1),dtype=np.float32)
     # momnp1 = np.zeros(n+1)
