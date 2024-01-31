@@ -13,9 +13,9 @@ pandoc_args: "--webtex"
 
 ```{r}
 library(Rcpp)
-library(expint)
+# library(expint)
 library(MASS)
-library(gplots)
+# library(gplots)
 library(ggplot2)
 # library(lme4)
 # library(brms)
@@ -35,7 +35,7 @@ N<-10000 # inds
 
 # just pick a grid of values here, say, ~50
 # gamma<-c(-exp(log(10)*seq(2, 0, length.out=20)))#,exp(log(10)*seq(-2, 2, length.out=25)))
-gamma<--10
+gamma<-100
 ```
 
 ## Simulating $X_l$
@@ -173,6 +173,88 @@ alleleAge<-function(X0, gamma, N){
         Xt<-rnorm(1, mean=mu, sd=sqrt(Xt*(1-Xt))*0.5/N)
     }
     return(gen)
+}
+
+alleleTraj<-function(X0, gamma, N){
+    gen<-1
+    Xt<-rep(0,10000)
+    Xt[gen]<-X0
+    # quit loop and record allele age if it dips below 1/2N
+    while(Xt[gen]>0.5/N){
+        gen<-gen+1
+        
+        mu<-Xt[gen-1]-0.25*gamma*Xt[gen-1]*(1-Xt[gen-1])/tanh(gamma*(1-Xt[gen-1]))/N
+        # mu<-0.25*gamma*Xt[gen-1]*(1-Xt[gen-1])/tanh(gamma*(1-Xt[gen-1]))/N
+        
+        Xt[gen]<-rnorm(1, mean=mu, sd=sqrt(Xt[gen-1]*(1-Xt[gen-1]))*0.5/N)
+    }
+    return(Xt[1:gen])
+}
+
+alleleTrajFwd<-function(gamma, N){
+    gen<-1
+    Xt<-rep(0,10000)
+    Xt[gen]<-0.5/N
+    
+    while(Xt[gen]>=0.5/N && Xt[gen]<1-0.5/N){
+        gen<-gen + 1
+        
+        mu<-Xt[gen-1]+0.25*gamma*Xt[gen-1]*(1-Xt[gen-1])/tanh(gamma*(1-Xt[gen-1]))/N
+        Xt[gen]<-rnorm(1, mean=mu, sd=sqrt(Xt[gen-1]*(1-Xt[gen-1]))*0.5/N)
+    }
+    return(Xt[1:gen])
+}
+```
+
+Below, I will create a function that will simulate a frequency trajectory and run *mssel* to create haplotypes under a binomial draw. 
+
+```{r}
+# for(rep in 1:2){
+#     Xl<-alleleTraj(0.3,220,10000)
+#     write("// This is an input file for Hudson's mssel stepftn.c program",'PReFerSims/msselfiles/TrajMsselLike-220.0.txt')
+#     write('1 N0: 10000','PReFerSims/msselfiles/TrajMsselLike-220.0.txt',append=T)
+#     write(paste0('# s: 0 age: ',length(Xl)/40000),'PReFerSims/msselfiles/TrajMsselLike-220.0.txt',append=T)
+#     write.table(rbind(c(0,0),cbind(1:length(Xl)/40000,rev(Xl))),'PReFerSims/msselfiles/TrajMsselLike-220.0.txt',append=T,sep=' ',quote=F,col.names=F,row.names=F)
+#     
+#     system("cat PReFerSims/msselfiles/TrajMsselLike-220.0.txt | ~/mssel/stepftn > PReFerSims/msselfiles/CurrTraj-220.0.txt")
+#     der <- rbinom(1,40,0.3)
+#     system(paste0("~/mssel/mssel3 40 1 ",40-der," ",der," PReFerSims/msselfiles/CurrTraj-220.0.txt 500 -r 0 1000 -t 20 -T > PReFerSims/msselfiles/haps-220.0_",rep,"_x30.ms"))
+# }
+
+cnt<-0; finalXl<-c()
+while(cnt<200){
+    Xl<-alleleTrajFwd(220,10000)
+    if(length(Xl)<1850){
+        next
+    }
+    else{
+        cnt<-cnt+1
+        finalXl<-c(finalXl,Xl[1:1850])
+    }
+}
+
+# storing the present day allele frequencies for use in binom calcs
+write.table(finalXl[seq(0,length(finalXl),1850)],'PReFerSims/msselfiles/hapfiles/Freq-22.0.txt',sep='\n',quote=F,col.names=F,row.names=F,append=T)
+ 
+## need to run this in the Console below for some reason
+# plot(finalXl[1:1850],col='#1f77b4',type='l',xlab='Generations',ylab='Allele Frequency',log='xy')
+# for(i in 2:50){
+#     lines(finalXl[((i-1)*1850+1):(i*1850)],col='#1f77b4')
+#     lines(finalXl22[((i-1)*1850+1):(i*1850)],col='#ff7f0e')
+# }
+# legend('topleft',c('200','20'),col=c('#1f77b4','#ff7f0e'),lty=1)
+
+
+for(i in 1:200){
+    write("// This is an input file for Hudson's mssel stepftn.c program",'PReFerSims/msselfiles/TrajMsselLike-22.0.txt')
+    write('1 N0: 10000','PReFerSims/msselfiles/TrajMsselLike-22.0.txt',append=T)
+    write(paste0('# s: 0 age: ',1850/40000),'PReFerSims/msselfiles/TrajMsselLike-22.0.txt',append=T)
+    write.table(rbind(c(0,0),cbind(1:1850/40000,rev(finalXl[((i-1)*1850+1):(i*1850)]))),'PReFerSims/msselfiles/TrajMsselLike-22.0.txt',append=T,sep=' ',quote=F,col.names=F,row.names=F)
+
+    system("cat PReFerSims/msselfiles/TrajMsselLike-22.0.txt | ~/mssel/stepftn > PReFerSims/msselfiles/CurrTraj-22.0.txt")
+    for(c in 1:10){
+        system(paste0("~/mssel/mssel3 3 1 1 2 PReFerSims/msselfiles/CurrTraj-220.0.txt 500 -r 0 1000 -t 20 -T > PReFerSims/msselfiles/hapfiles/haps-22.0_",i,"_c",c,"_t1850.ms"))
+    }
 }
 ```
 

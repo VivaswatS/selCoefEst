@@ -4,7 +4,7 @@ library(latex2exp)
 setwd("/Users/vivaswatshastry/selCoefEst/PReFerSims/")
 options(scipen=999)
 
-gamma <- 100 # change Mutation rate accordingly (200 for -10, 400 for -100)
+gamma <- 10 # change Mutation rate accordingly (200 for -10, 400 for -100)
 
 ## this is for a single selection coefficient 
 
@@ -62,7 +62,7 @@ cnt <- 1
 ## dry run
 al <- alleles[sample(200,1),1]
 system(paste0("sed -n '/^",al,"/p' MiniTest/Traj",gamma,".0.txt > MiniTest/TrajMini",gamma,".0.txt"))
-system(paste0("perl TrajToMsselFormat.pl MiniTest/TrajMini",gamma,".0 20000 msselfiles/trajfiles/TrajMsselLike",gamma,".0.txt ",al," 0 1"))
+system(paste0("perl TrajToMsselFormat.pl MiniTest/TrajMini",gamma,".0 20000 msselfiles/trajfiles/TrajMsselLike",gamma,".0.txt 1 0 1"))
 system(paste0("cat msselfiles/trajfiles/TrajMsselLike",gamma,".0.txt | \\
                   ~/mssel/stepftn > msselfiles/trajfiles/CurrTraj",gamma,".0.txt"))
 nder <- round(meta.prf[meta.prf[,5]==al,2]*200)
@@ -148,23 +148,37 @@ for(al in alleles[,1]){
     rel.est[cnt,1] <- rel.out$age_begin[rel.out$pos_of_snp==500000]
     rel.est[cnt,2] <- rel.out$age_end[rel.out$pos_of_snp==500000]
      
-    geva.est[cnt,] <- tryCatch(
-        read.table(paste0("gevafiles/outfiles/out",gamma,".0_",al,".sites2.txt"),header=T,sep=' ')[,5],
-        error = function(e) NA)
+    # geva.est[cnt,] <- tryCatch(
+    #     read.table(paste0("gevafiles/outfiles/out",gamma,".0_",al,".sites2.txt"),header=T,sep=' ')[,5],
+    #     error = function(e) NA)
     
     rel.true[cnt] <- 80000+1-meta.prf[meta.prf[,5]==al,4]
     cnt<-cnt+1
 }
+
+## reading in RelConstantSize files from midway3
+df<-read.table('msselfiles/relfiles/sumfiles/RelConstantSize0_id20.9.full_out.txt',header=F,sep='\t')
+df <- rbind(df,read.table('msselfiles/relfiles/sumfiles/RelConstantSize100_id21.9.full_out.txt',header=F,sep='\t'))
+rel.true <- 80000+1-df[,5]
+rel.est <- matrix(cbind(df[,7],df[,8]),ncol=2)
  
-plot(rel.true,0.5*(rel.est[,1]+rel.est[,2]),frame=F,log='xy',main=TeX('$\\gamma=-100$'),
-     ylab='est. age',xlab='true age (PReFerSim)',col='grey80',pch=20)
-segments(x0=rel.true,x1=rel.true,y0=rel.est[,1]+1,y1=rel.est[,2],col='grey80')
+plot(rel.true,0.5*(rel.est[,1]+rel.est[,2]),log='xy',frame=F,main=TeX('$\\gamma=-1$'),
+     ylab='est. age (Relate)',xlab='true age (PReFerSim)',col='grey80',pch=20,lwd=4,ylim=c(1,100000))
+segments(x0=rel.true,x1=rel.true,y0=rel.est[,1]+1,y1=rel.est[,2],col='grey80',lwd=3)
 points(rel.true,pmin(0.5*(rel.est[,1]+rel.est[,2]),2*rel.est[,1]+1),col='black',pch=20)
-points(rel.true,geva.est[,2],col='blue',pch=20)
-abline(0,1,col='grey20')
-# abline(485,0.55,col='grey80',lty=2)
+# points(rel.true,geva.est[,2],col='blue',pch=20)
+# abline(lsfit(rel.true,0.5*(rel.est[,1]+rel.est[,2])),col='grey60',lty=2)
+abline(lsfit(log10(rel.true),log10(0.5*(rel.est[,1]+rel.est[,2]))),col='grey60',lty=2,lwd=3)
+abline(0,1,col='grey20',lwd=3)
+text(5,4000,TeX('$y \\approx 0.06 x + 2300$'))
+text(5,2000,TeX('$R^2 \\approx 0.06$'))
 legend("topleft",col=c('grey','black',"blue"),bty='n',
        pch=20,legend=c(TeX('$T_{mid}$'),TeX('$min T_{mid},2T_{low}$'),'GEVA'))
+
+# -100
+# 1.5174 + 0.3649x, (no log) 169.6137567 + 0.8649518x, resid = 146
+# 0
+# 0.7724 + 0.7765x, (no log) 2005.3094596 + 0.6372335x, resid = 156
 
 ## plotting mechanism in which you sort the true ages and plot range on x-axis & (lb,ub) on y-axis
 plot(1:length(alleles[,1]),sort(rel.true),col='red',pch=4,frame=F,log='y',main=TeX('$\\gamma=-10$'),
@@ -178,3 +192,14 @@ plot(geva.est[,3],pmin(0.5*(rel.est[,1]+rel.est[,2]),2*rel.est[,1]),log='xy',
 text(600,13000,paste0('cor = ',signif(cor(
     geva.est[,3],pmin(0.5*(rel.est[,1]+rel.est[,2]),2*rel.est[,1]),use='complete.obs',method='spearman'),2)))
 abline(0,1,col='grey80')
+
+plot(df[,3]*200,rel.true,pch=20,frame=F,col='grey50',
+     xlab='sample freq.',ylab='true age (PReFerSim)',)
+points(df[,3]*200,rel.true,pch=20,col='grey80')
+legend('bottomright',c(TeX('$\\gamma=-100$'),TeX('$\\gamma=-1$')),col=c('grey80','grey50'),pch=20)
+
+
+## reading in Newick trees output by mssel
+library(ape)
+# tt<-read.tree('/Users/vivaswatshastry/selCoefEst/PReFerSims/msselfiles/haps5.0_r0.newick')
+tt <- read.tree(text='((5:0.123237,6:0.123237):0.866739,(3:0.322997,(1:0.221121,(2:0.058565,4:0.058565):0.162556):0.101876):0.666980);')

@@ -7,7 +7,7 @@ library(latex2exp)
 setwd("/Users/vivaswatshastry/selCoefEst/PReFerSims/msselfiles")
 
 # read in the third line
-posn <- readLines("haps5.0.ms",n=3)[3]
+posn <- readLines("haps10.0.ms",n=3)[3]
 
 # remove the first field 
 posn <- as.numeric(strsplit(posn," ")[[1]][-1])
@@ -41,3 +41,21 @@ text(0.5*(rel.out$age_begin+rel.out$age_end),
      pmin(0.5*(rel.out$age_begin+rel.out$age_end),2*rel.out$age_begin),
      col='grey80',labels=rel.out$pos_of_snp)
 abline(0,1)
+
+nt<-read.tree('/Users/vivaswatshastry/selCoefEst/PReFerSims/msselfiles/relfiles/tempfiles/sim100.0_15980626.newick')
+bid<-243
+start.end<-matrix(NA,nrow=100,ncol=2)
+for(i in 1:100){
+    start.end[i,1]<-max(node.depth.edgelength(nt[[i]]))-node.depth.edgelength(nt[[i]])[bid[2]]
+    start.end[i,2]<-max(node.depth.edgelength(nt[[i]]))-node.depth.edgelength(nt[[i]])[bid[1]]
+}
+
+nddep <- rep(0,399)
+for(n in 202:399){
+        nddep[n] <- max(node.depth.edgelength(nt))-node.depth.edgelength(nt)[n]
+}
+
+brlen <- rep(0,398)
+for(ie in 1:398){
+        brlen[ie]<-node.depth.edgelength(nt)[nt$edge[ie,2]]-node.depth.edgelength(nt)[nt$edge[ie,1]]
+}

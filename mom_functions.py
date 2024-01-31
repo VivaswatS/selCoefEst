@@ -395,10 +395,8 @@ def run_mom_iterate_changing4(n, s, Nc, theta):
     """function computing the moments equations using matrix of probability transitions instead of iterating through generations"""
     mom = np.zeros((len(Nc)+1,n+1),dtype=np.float32)
 
-    probmat = np.zeros((n+1,n+1))
     probvec = np.zeros(n+1)
     probdict = {}
-    superprobdict = {}
 
     # contains the generations, counting from len(Nc), at which population size changes 
     # (so if pop size changes 100 gens ago & we track 500 gens, then changepoints = [500, 401])
@@ -411,7 +409,7 @@ def run_mom_iterate_changing4(n, s, Nc, theta):
     print('Constructing probability transition matrices for each epoch',end='...')
     
     # creating a list of probability transition matrices for each 'epoch' (starting from the last 'epoch' and working forwards)
-    for iep, ep in enumerate(changepoints):
+    for _, ep in enumerate(changepoints):
         D = 0.25/Nc[ep] * calcD(n+1)
         # forward &  backward steps for stabilty
         slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - 0.5 * (D + S))
