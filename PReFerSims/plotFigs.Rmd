@@ -410,15 +410,16 @@ p + geom_line(meandf,mapping=aes(x=1-gen,y=Mean),color='steelblue',linewidth=2) 
 ```
 
 ```{r}
-finalRes <- read.table('resfiles/finalRes2023-12-19pt2.csv',header=T,sep=',')
+finalRes <- read.table('resfiles/finalRes2024-01-17.csv',header=T,sep=',')
 
 p <- finalRes %>% dplyr::mutate(est=est*40000) %>%
   ggplot() + geom_violin(aes(x=sim,y=est,group=interaction(factor(sim),freq),fill=factor(freq))) + 
   scale_x_continuous(trans='log',breaks=c(30,100,300),labels=c(30,100,300)) + 
-  scale_y_continuous(trans='log',breaks=c(30,100,300,1000,3000),labels=c(30,100,300,1000,3000)) + 
+  scale_y_continuous(trans='log',breaks=c(10,30,100,300,1000),labels=c(10,30,100,300,1000)) + 
   scale_color_manual(values=c('#9ecae1','#3182bd')) + scale_fill_manual(values=c('#9ecae1','#3182bd')) +
-  theme_linedraw() + geom_hline(aes(yintercept=sim),color='grey50',lty=2,size=1) 
-  #+ geom_hline(yintercept=100/20000,color='red') + 
+  theme_linedraw() + geom_hline(aes(yintercept=sim),color='grey50',lty=2,size=1)  
+  # geom_hline(yintercept=10^-4*40000,color='goldenrod') +
+  # geom_hline(yintercept=(10^-1.3)*40000,color='goldenrod') 
 p
 ```
 

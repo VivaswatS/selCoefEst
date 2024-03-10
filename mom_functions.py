@@ -905,6 +905,7 @@ def run_mom_iterate_constant(a, n, s, N, theta):
     for gen in np.arange(a)[::-1]:
         momkp1 = slv(Q.dot(mom[gen+1,]))
         momkp1[0] = momkp1[n] = 0.0
+        # momkp1[momkp1<0] = 0
 
         mom[gen,] = deepcopy(momkp1)
 

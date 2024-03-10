@@ -196,12 +196,20 @@ alleleTrajFwd<-function(gamma, N){
     Xt<-rep(0,10000)
     Xt[gen]<-0.5/N
     
-    while(Xt[gen]>=0.5/N && Xt[gen]<1-0.5/N){
-        gen<-gen + 1
-        
-        mu<-Xt[gen-1]+0.25*gamma*Xt[gen-1]*(1-Xt[gen-1])/tanh(gamma*(1-Xt[gen-1]))/N
-        Xt[gen]<-rnorm(1, mean=mu, sd=sqrt(Xt[gen-1]*(1-Xt[gen-1]))*0.5/N)
+    
+    while(i>0 && i<2*N){
+        i<-rbinom(1,2*N,Xt[gen]+gamma*0.5/N*Xt[gen]*(1-Xt[gen]))
+        Xt[gen+1]<-i/(2*N)
+        gen<-gen+1
     }
+    
+    # while(Xt[gen]>=0.5/N && Xt[gen]<1-0.5/N){
+    #     gen<-gen + 1
+    #     
+    #     mu<-Xt[gen-1]+0.25*gamma*Xt[gen-1]*(1-Xt[gen-1])/tanh(gamma*(1-Xt[gen-1]))/N
+    #     Xt[gen]<-rnorm(1, mean=mu, sd=sqrt(Xt[gen-1]*(1-Xt[gen-1]))*0.5/N)
+    # }
+    # return(Xt[1:gen])
     return(Xt[1:gen])
 }
 ```
@@ -221,41 +229,56 @@ Below, I will create a function that will simulate a frequency trajectory and ru
 #     system(paste0("~/mssel/mssel3 40 1 ",40-der," ",der," PReFerSims/msselfiles/CurrTraj-220.0.txt 500 -r 0 1000 -t 20 -T > PReFerSims/msselfiles/haps-220.0_",rep,"_x30.ms"))
 # }
 
-cnt<-0; finalXl<-c()
-while(cnt<200){
+cnt<-0; totcnt<-0; finalXl<-c()
+while(cnt<1000){
     Xl<-alleleTrajFwd(220,10000)
-    if(length(Xl)<1850){
+    if(length(Xl)<600){
+        totcnt<-totcnt+1
         next
     }
     else{
         cnt<-cnt+1
-        finalXl<-c(finalXl,Xl[1:1850])
+        finalXl<-c(finalXl,Xl[1:600])
     }
 }
 
 # storing the present day allele frequencies for use in binom calcs
-write.table(finalXl[seq(0,length(finalXl),1850)],'PReFerSims/msselfiles/hapfiles/Freq-22.0.txt',sep='\n',quote=F,col.names=F,row.names=F,append=T)
- 
-## need to run this in the Console below for some reason
-# plot(finalXl[1:1850],col='#1f77b4',type='l',xlab='Generations',ylab='Allele Frequency',log='xy')
-# for(i in 2:50){
-#     lines(finalXl[((i-1)*1850+1):(i*1850)],col='#1f77b4')
-#     lines(finalXl22[((i-1)*1850+1):(i*1850)],col='#ff7f0e')
-# }
-# legend('topleft',c('200','20'),col=c('#1f77b4','#ff7f0e'),lty=1)
+write.table(finalXl[seq(0,length(finalXl),600)],'PReFerSims/msselfiles/hapfiles/Freq-220.0.txt',sep='\n',quote=F,col.names=F,row.names=F)
+write.table(matrix(finalXl,nrow=1000,ncol=600,byrow=T),'PReFerSims/msselfiles/hapfiles/allFreq-220.0.txt',sep=',',quote=F,col.names=F,row.names=F)
+  
+# ## need to run this in the Console below for some reason
+plot(finalXl[1:600],col='#2ca02c',type='l',xlab='Generations',ylab='Allele Frequency',ylim=c(0,1))
+for(i in 2:1000){
+    lines(finalXl[((i-1)*600+1):(i*600)],col='#2ca02c')
+    # lines(finalXl22[((i-1)*1850+1):(i*1850)],col='#ff7f0e')
+}
+legend('topleft',c('0','20'),col=c('#2ca02c','#ff7f0e'),lty=1)
 
+for(i in 401:1000){
+    write("// This is an input file for Hudson's mssel stepftn.c program",'PReFerSims/msselfiles/TrajMsselLike-220.0.txt')
+    write('1 N0: 10000','PReFerSims/msselfiles/TrajMsselLike-220.0.txt',append=T)
+    write(paste0('# s: ',220/40000,' age: ',600/40000),'PReFerSims/msselfiles/TrajMsselLike-220.0.txt',append=T)
+    write.table(rbind(c(0,0),cbind(1:600/40000,finalXl[((i-1)*600+1):(i*600)])),'PReFerSims/msselfiles/TrajMsselLike-220.0.txt',append=T,sep=' ',quote=F,col.names=F,row.names=F)
 
-for(i in 1:200){
-    write("// This is an input file for Hudson's mssel stepftn.c program",'PReFerSims/msselfiles/TrajMsselLike-22.0.txt')
-    write('1 N0: 10000','PReFerSims/msselfiles/TrajMsselLike-22.0.txt',append=T)
-    write(paste0('# s: 0 age: ',1850/40000),'PReFerSims/msselfiles/TrajMsselLike-22.0.txt',append=T)
-    write.table(rbind(c(0,0),cbind(1:1850/40000,rev(finalXl[((i-1)*1850+1):(i*1850)]))),'PReFerSims/msselfiles/TrajMsselLike-22.0.txt',append=T,sep=' ',quote=F,col.names=F,row.names=F)
-
-    system("cat PReFerSims/msselfiles/TrajMsselLike-22.0.txt | ~/mssel/stepftn > PReFerSims/msselfiles/CurrTraj-22.0.txt")
+    system("cat PReFerSims/msselfiles/TrajMsselLike-220.0.txt | ~/mssel/stepftn > PReFerSims/msselfiles/CurrTraj-220.0.txt")
     for(c in 1:10){
-        system(paste0("~/mssel/mssel3 3 1 1 2 PReFerSims/msselfiles/CurrTraj-220.0.txt 500 -r 0 1000 -t 20 -T > PReFerSims/msselfiles/hapfiles/haps-22.0_",i,"_c",c,"_t1850.ms"))
+        system(paste0("~/mssel/mssel3 3 1 1 2 PReFerSims/msselfiles/CurrTraj-220.0.txt 500 -r 0 1000 -t 20 -T > PReFerSims/msselfiles/hapfiles/haps-220.0_",i,"_c",c,"_t600.ms"))
     }
 }
+```
+Computing the appropriate probability density for comparison with the moments framework.
+
+$$P(i=2 \mid n=3, a=1850, \gamma=200)/\sum_{i=1,2} P(i \mid n=3, a=1850, \gamma=200)$$
+
+```{r}
+Xl <- alleleTrajFwd(300,10000)
+write("// This is an input file for Hudson's mssel stepftn.c program",'PReFerSims/msselfiles/TrajMsselLike-220.0.txt')
+write('1 N0: 10000','PReFerSims/msselfiles/TrajMsselLike-220.0.txt',append=T)
+write(paste0('# s: ',220/40000,' age: ',600/40000),'PReFerSims/msselfiles/TrajMsselLike-220.0.txt',append=T)
+write.table(rbind(c(0,0),cbind(1:600/40000,finalXl[((12-1)*600+1):(12*600)])),'PReFerSims/msselfiles/TrajMsselLike-220.0.txt',append=T,sep=' ',quote=F,col.names=F,row.names=F)
+system("cat PReFerSims/msselfiles/TrajMsselLike-220.0.txt | ~/mssel/stepftn > PReFerSims/msselfiles/CurrTraj-220.0.txt")
+der<-rbinom(1,40,finalXl[12*600])
+system(paste0("~/mssel/mssel3 40 1 ",40-der," ",der," PReFerSims/msselfiles/CurrTraj-220.0.txt 500 -r 0 1000 -t 20 -T > PReFerSims/msselfiles/hapfiles/haps-220.0_123_t600.ms"))
 ```
 
 I will run the below function for each of our training data points (~25k) to get allele age given $\gamma$ and $X_l$. Thankfully, this Rcpp function runs ~30x faster than the regular R function. 
