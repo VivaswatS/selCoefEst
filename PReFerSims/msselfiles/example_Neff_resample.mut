@@ -1,0 +1,2 @@
+snp;pos_of_snp;dist;rs-id;tree_index;branch_indices;is_not_mapping;is_flipped;age_begin;age_end;ancestral_allele/alternative_allele;
+43;509981;149;SNP44;0;53;0;0;46.6315;1019.45;A/T;

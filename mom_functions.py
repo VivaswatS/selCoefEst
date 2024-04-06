@@ -18,7 +18,7 @@ from copy import deepcopy
 # import matplotlib.colors as colors
 import moments
 # import warnings
-# from numba import njit
+from numba import njit
 # warnings.filterwarnings('error')
 
 # rng setup
@@ -35,16 +35,19 @@ import moments
 # np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
 
 ## borrowed directly from https://bitbucket.org/simongravel/moments/src/main/moments/Jackknife.pyx
+# @njit('int32(float64)')
 def python2round(f):
     if round(f + 1) - round(f) != 1:
         return f + abs(f) / f * 0.5
     return round(f)
 
 # The choice i' in n samples that best approximates the frequency of i/(n + 1) is i*n / (n + 1)
+# @njit('int32(int32,int32)')
 def index_bis(i, n):
     return int(min(max(python2round(i * n / float(n+1)), 2), n-2))
 
 # code borrowed from https://bitbucket.org/simongravel/moments/src/main/moments/Jackknife.pyx   
+# @njit('float64[:,:](int32)')
 def calcJK13(n):
     J = np.zeros((n,n-1))
     for i in range(n):
@@ -65,6 +68,7 @@ def calcJK23(n):
         J[i, ibis + 1] = (1.+n) * ((2.+i)*(2.+n)*(-4.+(i+1.)*(3.+n))-(5.+n)*(n+2.*(i+1.)*(2.+n))*(ibis+1.)+(20.+9.*n+n**2)*(ibis+1.)**2) / (3.+n) / (4.+n) / (5.+n) / 2.
     return J
 
+# @jit(nopython=False)
 def calcD(d):
     # res = np.zeros([d, d])
     # # loop over the fs elements:
@@ -96,6 +100,7 @@ def calcD(d):
 
     return coo_matrix((data, (row, col)), shape=(d, d), dtype='float').tocsc()
 
+# @jit(nopython=False)
 def calcS(d, ljk):
     # Computes the jackknife-transformed selection matrix 1
     # for the addition of a single sample
@@ -172,7 +177,6 @@ def run_mom_iterate_mom(n, g, nu, gens, theta, sms):
 
     return mom
 
-# @njit('float64[:,:](int64,float64,float64[:],float64)',cache=True)
 def run_mom_iterate_changing(n, s, Nc, mu):
     mom = np.zeros((len(Nc),n+1),dtype=np.float32)
     # momnp1 = np.zeros(n+1)
@@ -347,7 +351,7 @@ def run_mom_iterate_changing3(n, s, Nc, theta):
     J = calcJK13(n)
     S = 0.5 * s * calcS(n+1, J)
 
-    print('Constructing probability transition matrices for each epoch',end='...')
+    # print('Constructing probability transition matrices for each epoch',end='...')
     
     # creating a list of probability transition matrices for each 'epoch' (starting from the last 'epoch' and working forwards)
     for iep, ep in enumerate(changepoints):
@@ -364,7 +368,7 @@ def run_mom_iterate_changing3(n, s, Nc, theta):
     
     initvec = np.array([0]+[n*0.25*theta]+[0]*(n-1))
     
-    print('done!\n Starting SFAS construction: ')
+    # print('done!\n Starting SFAS construction: ')
 
     for gen in np.arange(1,len(Nc)+1):
         # indicator for which prob transition matrix to use (should be the oldest one that is still younger than the current gen)
@@ -383,20 +387,100 @@ def run_mom_iterate_changing3(n, s, Nc, theta):
         
         mom[gen,] = probmat 
 
-        if gen*100/len(Nc)%20 == 0 and gen/len(Nc) < 1:
-            print('{:d}%'.format(int(gen*100/len(Nc))), end='...')
-    print('done!')
+        # if gen*100/len(Nc)%20 == 0 and gen/len(Nc) < 1:
+        #     print('{:d}%'.format(int(gen*100/len(Nc))), end='...')
+    # print('done!')
     mom[:,0] = 0; mom[:,n] = 0
 
     return mom#[:-1,:]
 
+from numba.typed import Dict
+from numba import types
 # FASTER VERSION OF ABOVE FUNCTION (~10x speed-up)
 def run_mom_iterate_changing4(n, s, Nc, theta):
     """function computing the moments equations using matrix of probability transitions instead of iterating through generations"""
-    mom = np.zeros((len(Nc)+1,n+1),dtype=np.float32)
+    mom = np.zeros((len(Nc)+1,n+1), dtype=np.float64, order='C')
 
     probvec = np.zeros(n+1)
-    probdict = {}
+    # probdict = {}
+    probdict = Dict.empty(key_type=types.int64, value_type=types.float64[:,::1])
+
+    # contains the generations, counting from len(Nc), at which population size changes 
+    # (so if pop size changes 100 gens ago & we track 500 gens, then changepoints = [500, 401])
+    changepoints = np.array(np.concatenate((np.array([1]),np.where(Nc[:-1] != Nc[1:])[0]+1),axis=0), dtype='int32', order='C')
+
+    # only need to do this once - no dependence on N
+    J = calcJK13(n)
+    S = 0.5 * s * calcS(n+1, J)
+
+    # print('Constructing probability transition matrices for each epoch',end='...')
+    
+    # creating a list of probability transition matrices for each 'epoch' (starting from the last 'epoch' and working forwards)
+    for _, ep in enumerate(changepoints):
+        D = 0.25/Nc[ep] * calcD(n+1)
+        # forward &  backward steps for stabilty
+        slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - 0.5 * (D + S))
+        Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + 0.5 * (D + S)
+        # creating the probability transition matrix for each 'epoch'
+        probdict[ep] = np.array(slv(Q.toarray()), order='C')
+        # initvec[ep] = sp.sparse.csr_array([0]+[n*theta/(4*Nc[ep])]+[0]*(n-1)).T
+        # contains the matrix powers for the whole epoch (saves you the time for calculating them later)
+        # superprobdict[ep] = np.linalg.matrix_power(probdict[ep],np.append(changepoints,len(Nc))[iep+1]-changepoints[iep])
+    
+    initvec = np.zeros(n+1); initvec[1] = n*0.25*theta
+    probvec = np.zeros((n+1,n+1), dtype='float64', order='C')
+    # print(numba.typeof(initvec))
+    # print(numba.typeof(probdict[changepoints[0]]))
+    # initvec = np.array([0]+[n*0.25*theta]+[0]*(n-1))
+    
+    # print('done!\n Starting SFAS construction: ')
+    
+    ## probdict is a sparse array so just code up the matrix multiplication for the <10% of elements that will be non-zero...
+
+    mom = matrix_evolve(changepoints, probvec, probdict, initvec, len(Nc))
+
+    # for gen in np.arange(2,len(Nc)+1):
+    #     # indicator for which prob transition matrix to use (should be the oldest one that is still younger than the current gen)
+        # whichep = np.max(np.where(changepoints-gen<=0)[0]) # will throw an error if it exceeds the oldest gen
+    #     # raise the probability transition matrix to the right power
+        # probvec = probvec @ probdict[changepoints[whichep]]
+        # mom[gen,] = probvec @ initvec
+        # probvec, mom[gen,] = matrix_mult(probvec, probdict[changepoints[whichep]], initvec)
+    #     # if len(np.where(mom[gen,:-1]-mom[gen,1:]<0)[0])>1:
+    #     #     mom[gen,][np.where(mom[gen,:-1]-mom[gen,1:]<0)[0][1]:] = 0
+    #     if np.sum(mom[gen,]>1e6):
+    #         print(gen)
+    #         break
+
+    #     if gen*100/len(Nc)%20 == 0 and gen/len(Nc) < 1:
+    #         print('{:d}%'.format(int(gen*100/len(Nc))), end='...')
+    # print('done!')
+    mom[:,0] = 0; mom[:,n] = 0
+
+    return mom#[:-1,:]
+
+# @njit 
+# def matrix_mult(probvec, probdict, initvec):
+#     probvec1 = probvec @ probdict
+#     return probvec1 @ initvec
+
+@njit(parallel=True)#('float64[:,::1](int32[::1], float64[::1], DictType(int64, float64[:,::1]), float64[::1], int32)')
+def matrix_evolve(changepoints, probvec, probdict, initvec, lenNc):
+    mom = np.zeros((lenNc+1,probdict[changepoints[0]].shape[0]),dtype=np.float64)
+    probvec = probdict[changepoints[0]]
+    mom[1,] = probvec @ initvec
+    for gen in np.arange(2,lenNc+1):
+        whichep = np.max(np.where(changepoints-gen<=0)[0])
+        probvec = probvec @ probdict[changepoints[whichep]]
+        mom[gen,] = probvec @ initvec
+
+    return mom
+
+def run_mom_iterate_changing5(n, s, Nc, theta):
+    """function computing the moments equations using matrix of probability transitions instead of iterating through generations"""
+    mom = np.zeros((len(Nc)+1,n+1),dtype=np.float64)
+
+    probslv = {}; probQ = {}; probdict = {}
 
     # contains the generations, counting from len(Nc), at which population size changes 
     # (so if pop size changes 100 gens ago & we track 500 gens, then changepoints = [500, 401])
@@ -406,7 +490,7 @@ def run_mom_iterate_changing4(n, s, Nc, theta):
     J = calcJK13(n)
     S = 0.5 * s * calcS(n+1, J)
 
-    print('Constructing probability transition matrices for each epoch',end='...')
+    # print('Constructing probability transition matrices for each epoch',end='...')
     
     # creating a list of probability transition matrices for each 'epoch' (starting from the last 'epoch' and working forwards)
     for _, ep in enumerate(changepoints):
@@ -416,6 +500,8 @@ def run_mom_iterate_changing4(n, s, Nc, theta):
         Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + 0.5 * (D + S)
         # creating the probability transition matrix for each 'epoch'
         # probdict[ep] = sp.sparse.csr_matrix(slv(Q.toarray())) 
+        # probslv[ep] = slv
+        # probQ[ep] = Q
         probdict[ep] = slv(Q.toarray())
         # initvec[ep] = sp.sparse.csr_array([0]+[n*theta/(4*Nc[ep])]+[0]*(n-1)).T
         # contains the matrix powers for the whole epoch (saves you the time for calculating them later)
@@ -423,10 +509,11 @@ def run_mom_iterate_changing4(n, s, Nc, theta):
     
     initvec = np.array([0]+[n*0.25*theta]+[0]*(n-1))
     
-    print('done!\n Starting SFAS construction: ')
+    # print('done!\n Starting SFAS construction: ')
 
     probvec = probdict[changepoints[0]]
     mom[1,] = probvec @ initvec
+    # mom[1,] = probslv[changepoints[0]](probQ[changepoints[0]].dot(initvec))
     mom[1,0] = 0; mom[1,n] = 0
 
     for gen in np.arange(2,len(Nc)+1):
@@ -434,21 +521,15 @@ def run_mom_iterate_changing4(n, s, Nc, theta):
         whichep = np.max(np.where(changepoints-gen<=0)[0]) # will throw an error if it exceeds the oldest gen
         # raise the probability transition matrix to the right power
         # (if gen is in the most recent epoch, then run for gen gens, otherwise for (gen - next epoch) gens)
+        # mom[gen,] = probslv[changepoints[whichep]](probQ[changepoints[whichep]].dot(mom[gen-1,])) 
         probvec = probvec @ probdict[changepoints[whichep]]
         mom[gen,] = probvec @ initvec
-        # run this loop from whichep to the most recent epoch (going forwards in time)
-        ## can optimize here by storing the transition matrix at each gen in a different object so no raising to power (try it?)
-        # for iep in np.arange(0,whichep)[::-1]:
-        #     probmat = superprobdict[changepoints[iep]] @ probmat
-        # manually do the operation for the last epoch (iep=0) since changepoints[-1] doesn't exist 
-        # (can skip this step since it's included in the previous operation)
-        # if whichep>=1:
-        #     probmat = np.linalg.matrix_power(probdict[changepoints[0]],changepoints[1]-changepoints[0]) @ probmat
-        
-        if gen*100/len(Nc)%20 == 0 and gen/len(Nc) < 1:
-            print('{:d}%'.format(int(gen*100/len(Nc))), end='...')
-    print('done!')
+
     mom[:,0] = 0; mom[:,n] = 0
+
+    #     if gen*100/len(Nc)%20 == 0 and gen/len(Nc) < 1:
+    #         print('{:d}%'.format(int(gen*100/len(Nc))), end='...')
+    # print('done!')
 
     return mom#[:-1,:]
 
@@ -492,6 +573,7 @@ def get_lp_xl_pois(pxas, g, sXlred, n=2000, cutoff=2):
         res[idx] = -pxas[g][sXlred[i]] + np.log(pxas[g][sXlred[i]])*sXlred[i] - sp.special.gammaln(sXlred[i]+1)
     
     return res
+
 def get_lp_xl_bin(pxas, g, sXlred, n=2000, cutoff=2):
     """function to compute L(gamma|Xl), where gamma is a range of values and Xl is a given set of freqs"""
     res = np.empty(np.sum((sXlred>=cutoff) & (sXlred<=n-cutoff+1))) #np.empty(len(Xlred))
@@ -884,30 +966,28 @@ def get_ll_freqagechanging(g, opts, n=1000, cutoff=2):
 ## packaging into a function for easy manipulation - iteration implementation 
 # input: a (number of gens), n (number of samples), s, N (pop size)
 # output: mom (number of sites)
+# @njit('float64[:,:](int32,int32,float64,int32,int32)',cache=True)
 def run_mom_iterate_constant(a, n, s, N, theta):
     mom = np.zeros((a+1,n+1),dtype=np.float32)
     # momnp1 = np.zeros(n+1)
     momkp1 = np.zeros(n+1,dtype=np.float32)
-
-    dt = 1
 
     J = calcJK13(n)
     D = 0.25/N * calcD(n+1)
     S = 0.5 * s * calcS(n+1, J)
 
     # if N is same across all gens then only have to do this once
-    slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - dt / 2.0 * (D + S))
-    Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + dt / 2.0 * (D + S)
+    slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - 0.5 * (D + S))
+    Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + 0.5 * (D + S)
 
     mom[a,1] = n*theta/(4*N) # singleton input
 
-    # going from generation 9 to 0
     for gen in np.arange(a)[::-1]:
         momkp1 = slv(Q.dot(mom[gen+1,]))
         momkp1[0] = momkp1[n] = 0.0
         # momkp1[momkp1<0] = 0
 
-        mom[gen,] = deepcopy(momkp1)
+        mom[gen,] = momkp1
 
     return mom[1:,:]           
 
