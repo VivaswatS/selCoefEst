@@ -1,6 +1,9 @@
-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
 .DS_Store
 PReFerSims/simfiles/*
-testdata/.DS_Store
+archive/*
 PReFerSims/outfiles/*.txt
 .vscode/*
+PReFerSims/msselfiles/*
+__pycache__/*
+.ipynb_checkpoints/*
+.jupyter/*
