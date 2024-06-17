@@ -35,7 +35,7 @@ ratio.sd<-colVar(parestfreq)/colVar(parestage)
 
 ```{r}
 # plot(-list.of.gamma,ratio.sd,pch=20,frame=F,xlab=TeX('$\\gamma$'),ylab='ratio of SD',log='x',xaxt='n'); grid(); ylim(0.9,1.5); abline(h=1,col='grey80',lty=2); axis(1,at=1:5,labels=10^seq(-2,2,1))
-# df <- data.frame(gam=list.of.gamma,rsd=ratio.sd)
+df <- data.frame(gam=list.of.gamma,rsd=ratio.sd)
  
 ggplot(df) + geom_point(aes(x=gam,y=rsd)) + theme_bw() +
     geom_smooth(aes(x=gam,y=rsd),method='gam',color='grey40',size=1) +
@@ -46,10 +46,10 @@ ggplot(df) + geom_point(aes(x=gam,y=rsd)) + theme_bw() +
         axis.title=element_text(size=rel(1.7),face="bold"))
 
 ## reshaping the data into tidyverse format
-df3<-data.frame(tid=rep(rep(1:50,each=100),2),
-                sim=rep(rep(big.gamma,each=100),2),
-                method=c(rep('SFS',5000),rep('SFAS',5000)),
-                est=c(parest[,1],parest[,2]))
+# df3<-data.frame(tid=rep(rep(1:50,each=100),2),
+#                 sim=rep(rep(big.gamma,each=100),2),
+#                 method=c(rep('SFS',5000),rep('SFAS',5000)),
+#                 est=c(parest[,1],parest[,2]))
 
 # df3 %>% dplyr::filter(tid %in% 1:10) %>% ggplot(aes(x=factor(tid),y=est,color=method)) + geom_violin(position='dodge') + 
 #     scale_y_continuous(trans='pseudo_log',breaks=c(0,-1,-10,-100),labels=c(0,-1,-10,-100)) + 
@@ -109,14 +109,14 @@ ggsave('~/selCoefEst/figs/RatioSDNeg2.5pcRel.jpeg',height=4,width=6)
 
 df4<-data.frame(tid=rep(rep(1:20,each=100),4),
                 sim=rep(rep(list.of.gamma[1:20],each=100),4),
-                method=c(rep('SFS',2000),rep('SFAS with true ages',2000),rep('SFAS with Relate est.',2000),rep('SFAS with branch avg.',2000)),
+                method=c(rep('Freq only',2000),rep('Freq & age with true ages',2000),rep('Freq & age with Relate est.',2000),rep('Freq & age with branch avg.',2000)),
                 est=c(as.vector(fo),as.vector(ta),as.vector(rm),as.vector(ims)))
 
 #dplyr::filter(method %in% c('SFS','SFAS with true ages','SFAS with Relate est.','SFAS with imp. samp.'))
-df4 %>% dplyr::filter(tid %in% c(1,5,9,13,17,19)) %>% dplyr::filter(method %in% c('SFS','SFAS with true ages','SFAS with Relate est.','SFAS with branch avg.')) %>% dplyr::mutate(xpos=rep(rep(c(1,6,11,14.5,18,20),each=100),4)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_violin(aes(x=xpos,y=est,fill=method),position='dodge',trim=T,scale='width') + 
+df4 %>% dplyr::filter(tid %in% c(1,5,9,13,17,19)) %>% dplyr::filter(method %in% c('Freq only','Freq & age with true ages','Freq & age with Relate est.','Freq & age with branch avg.')) %>% dplyr::mutate(xpos=rep(rep(c(1,6,11,14.5,18,20),each=100),4)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_violin(aes(x=xpos,y=est,fill=method),position='dodge',trim=T,scale='width') + 
     # stat_summary(aes(x=factor(tid),y=est,fill=method),fun.data=mean_sdl, geom="pointrange", color="black",position=position_dodge(width = 1.9),size=0.1) +
     geom_hline(aes(yintercept=sim),color='grey50',lty=2,size=0.5) + 
-    labs(title="Using all sites", x=TeX('$\\gamma$'), y = TeX('$\\hat{\\gamma}$')) +
+    labs(x=TeX('$\\gamma$'), y = TeX('$\\hat{\\gamma}$')) +
   scale_fill_manual(values=c('grey80','steelblue','grey40','goldenrod')) + 
     scale_y_continuous(trans='pseudo_log',breaks=c(10,1,0,-1,-10,-100),labels=c(10,1,0,-1,-10,-100)) + 
     scale_x_discrete(breaks=c(1,11,18,20),labels=c(-100,-10,-1,0),limits=1:20) +
@@ -128,10 +128,10 @@ df4 %>% dplyr::filter(tid %in% c(1,5,9,13,17,19)) %>% dplyr::filter(method %in% 
                        legend.position=c(0.7,0.25)) 
 ggsave('~/selCoefEst/figs/EstNegwIS.jpeg',height=7,width=9)
 
-df4 %>% dplyr::filter(tid %in% c(1,5,9,13,17,19)) %>% dplyr::filter(method %in% c('SFS','SFAS with true ages')) %>% dplyr::mutate(xpos=rep(rep(c(1,6,11,14.5,18,20),each=100),2)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_violin(aes(x=xpos,y=est,fill=method),position='dodge',trim=T,scale='width') +
+df4 %>% dplyr::filter(tid %in% c(1,5,9,13,17,19)) %>% dplyr::filter(method %in% c('Freq only','Freq & age with true ages')) %>% dplyr::mutate(xpos=rep(rep(c(1,6,11,14.5,18,20),each=100),2)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_violin(aes(x=xpos,y=est,fill=method),position='dodge',trim=T,scale='width') +
     # stat_summary(aes(x=factor(tid),y=est,fill=method),fun.data=mean_sdl, geom="pointrange", color="black",position=position_dodge(width = 1.9),size=0.1) +
     geom_hline(aes(yintercept=sim),color='grey50',lty=2,size=0.5) + 
-    labs(title="Using only sites with MAF>2.5%",x=TeX('$\\gamma$'), y = TeX('$\\hat{\\gamma}$')) +
+    labs(x=TeX('$\\gamma$'), y = TeX('$\\hat{\\gamma}$')) +
   scale_fill_manual(values=c('grey40','goldenrod','grey80','steelblue')) + 
     scale_y_continuous(trans='pseudo_log',breaks=c(0,-1,-10,-100,-1000),labels=c(0,-1,-10,-100,-1000)) + 
     scale_x_discrete(breaks=c(1,11,18,20),labels=c(-100,-10,-1,0),limits=1:20) +
@@ -160,13 +160,13 @@ ims <- t(matrix(finalest$impsamp,nrow=20,ncol=100))
 
 df4<-data.frame(tid=rep(rep(1:20,each=100),2),
                 sim=rep(rep(list.of.gamma[1:20],each=100),2),
-                method=c(rep('SFS',2000),rep('SFAS with true ages',2000)),
+                method=c(rep('Freq only',2000),rep('Freq & age with true ages',2000)),
                 est=c(as.vector(fo),as.vector(ta)))
 
-df4 %>% dplyr::filter(tid %in% c(4,8,12,15,20)) %>% dplyr::filter(method %in% c('SFS','SFAS with true ages')) %>% dplyr::mutate(xpos=rep(rep(c(3,6.5,10,15,20),each=100),2)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_violin(aes(x=xpos,y=est,fill=method),position='dodge',trim=T,scale='width') +
+df4 %>% dplyr::filter(tid %in% c(4,8,12,15,20)) %>% dplyr::filter(method %in% c('Freq only','Freq & age with true ages')) %>% dplyr::mutate(xpos=rep(rep(c(3,6.5,10,15,20),each=100),2)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_violin(aes(x=xpos,y=est,fill=method),position='dodge',trim=T,scale='width') +
     # stat_summary(aes(x=factor(tid),y=est,fill=method),fun.data=mean_sdl, geom="pointrange", color="black",position=position_dodge(width = 1.9),size=0.1) +
     geom_hline(aes(yintercept=sim),color='grey50',lty=2,size=0.5) + 
-    labs(title="Assuming a constant demography",x=TeX('$\\gamma$'), y = TeX('$\\hat{\\gamma}$')) +
+    labs(x=TeX('$\\gamma$'), y = TeX('$\\hat{\\gamma}$')) +
   scale_fill_manual(values=c('grey40','goldenrod')) + 
     scale_y_continuous(trans='pseudo_log',breaks=c(1,10,100,1000),labels=c(1,10,100,1000)) + 
     scale_x_discrete(breaks=c(3,10,20),labels=c(1,10,100),limits=1:20) +
@@ -178,18 +178,18 @@ df4 %>% dplyr::filter(tid %in% c(4,8,12,15,20)) %>% dplyr::filter(method %in% c(
                        legend.text = element_text(size=rel(1.1)))
 ggsave('~/selCoefEst/figs/EstPos.jpeg',height=7,width=9)
 
-df4<-data.frame(tid=rep(rep(1:10,each=100),2),
-                sim=rep(rep(list.of.gamma[1:10],each=100),2),
-                method=c(rep('SFS',1000),rep('SFAS with true ages',1000)),
-                est=c(as.vector(fo),as.vector(ta)))
+# df4<-data.frame(tid=rep(rep(1:10,each=100),2),
+#                 sim=rep(rep(list.of.gamma[1:10],each=100),2),
+#                 method=c(rep('Freq only',1000),rep('Freq & age with true ages',1000)),
+#                 est=c(as.vector(fo),as.vector(ta)))
 
-df4 %>% dplyr::filter(tid %in% c(4,7,10)) %>% dplyr::filter(method %in% c('SFS','SFAS with true ages')) %>% dplyr::mutate(xpos=rep(rep(c(1,4,10),each=100),2)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_boxplot(aes(x=xpos,y=est,fill=method),position='dodge') +
+df4 %>% dplyr::filter(tid %in% c(4,7,10)) %>% dplyr::filter(method %in% c('Freq only','Freq & age with true ages')) %>% dplyr::mutate(xpos=rep(rep(c(1,4,10),each=100),2)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_boxplot(aes(x=xpos,y=est,fill=method),position='dodge') +
     # stat_summary(aes(x=factor(tid),y=est,fill=method),fun.data=mean_sdl, geom="pointrange", color="black",position=position_dodge(width = 1.9),size=0.1) +
     geom_hline(aes(yintercept=sim),color='grey50',lty=2,size=0.5) + 
-    labs(x=TeX('$\\gamma$'), y = TeX('$\\hat{\\gamma}$')) +
+    labs(x=TeX('$s$'), y = TeX('$\\hat{s}$')) +
   scale_fill_manual(values=c('grey40','goldenrod')) + 
-    scale_y_continuous(trans='pseudo_log',labels=c(1,10,100),breaks=c(0.5,5,50)) + 
-    scale_x_discrete(breaks=c(1,4,10),labels=c(1,10,100),limits=1:10) +
+    scale_y_continuous(trans='pseudo_log',labels=function(x)x/10000,breaks=c(0.5,5,50)) + 
+    scale_x_discrete(breaks=c(1,4,10),labels=c(5e-5,5e-4,5e-3),limits=1:10) +
     theme_bw() + theme(axis.text = element_text(size = 12),
                        axis.title = element_text(size = 16),
                        legend.key = element_rect(colour="transparent"),
@@ -198,13 +198,13 @@ df4 %>% dplyr::filter(tid %in% c(4,7,10)) %>% dplyr::filter(method %in% c('SFS',
                        legend.text = element_text(size=rel(1.1)))
 ggsave('~/selCoefEst/figs/MLEAFRpos.jpg',height=6,width=6)
 
-df4 %>% dplyr::filter(tid %in% c(1,16,31,35)) %>% dplyr::filter(method %in% c('SFS','SFAS with true ages')) %>% dplyr::mutate(xpos=rep(rep(c(1,11,18,20),each=100),2)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_boxplot(aes(x=xpos,y=est,fill=method),position='dodge') +
+df4 %>% dplyr::filter(tid %in% c(1,16,31,35)) %>% dplyr::filter(method %in% c('Freq only','Freq & age with true ages')) %>% dplyr::mutate(xpos=rep(rep(c(1,11,18,20),each=100),2)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_boxplot(aes(x=xpos,y=est,fill=method),position='dodge') +
     # stat_summary(aes(x=factor(tid),y=est,fill=method),fun.data=mean_sdl, geom="pointrange", color="black",position=position_dodge(width = 1.9),size=0.1) +
-    scale_y_continuous(trans='pseudo_log',labels=c(-100,-10,-1,0),breaks=c(-100,-10,-1,0)) +
+    scale_y_continuous(trans='pseudo_log',labels=function(x)x/20000,breaks=c(-100,-10,-1,0)) +
     geom_hline(aes(yintercept=sim),color='grey50',lty=2,size=0.5) + 
-    labs(x=TeX('$\\gamma$'), y = TeX('$\\hat{\\gamma}$')) +
+    labs(x=TeX('$s$'), y = TeX('$\\hat{s}$')) +
   scale_fill_manual(values=c('grey40','goldenrod')) + 
-    scale_x_discrete(breaks=c(1,11,18,20),labels=c(-100,-10,-1,0),limits=1:35) +
+    scale_x_discrete(breaks=c(1,11,18,20),labels=c(-0.005,-0.0005,-0.00005,0),limits=1:35) +
     theme_bw() + theme(axis.text = element_text(size = 12),
                        axis.title = element_text(size = 16),
                        legend.key = element_rect(colour="transparent"),
@@ -212,7 +212,6 @@ df4 %>% dplyr::filter(tid %in% c(1,16,31,35)) %>% dplyr::filter(method %in% c('S
                        legend.position=c(0.25,0.8),
                        legend.text = element_text(size=rel(1.1)))
 ggsave('~/selCoefEst/figs/MLEAFRneg.jpg',height=6,width=6)
-
 
 df <- data.frame(gam=list.of.gamma[1:35],rsd=ratio.sd)
 ggplot(df) + geom_point(aes(x=gam,y=rsd)) + theme_bw() +
@@ -227,24 +226,23 @@ ratio.sd.afr<-colVar(fo)/colVar(ta)
 ratio.sd.afr.pos<-colVar(fo)/colVar(ta)
 
 # goi <- data.frame(gam=c(big.gamma,c(rev(10^seq(log10(1),log10(100),length.out=17)),0.332,0.05,0),list.of.gamma[1:20],list.of.gamma.afr[1:35],2*rev(10^seq(log10(0.05),log10(50),length.out=10))),
-#                   method=c(rep('Using true ages (constant)',70),rep('Using Relate est. ages with imp. samp.',20),rep('Using true ages (AFR-like)',45)),
-#                   val=c(ratio.sd,colVar(fo)/colVar(ta),ratio.sd.ims,ratio.sd.afr,ratio.sd.afr.pos))
+#                   method=c(rep('Using true ages (constant)',70),rep('Using Relate est. ages with imp. samp.',20),rep('#                   val=c(ratio.sd,colVar(fo)/colVar(ta),ratio.sd.ims,ratio.sd.afr,ratio.sd.afr.pos))
 # write.table(goi,'resfiles/goi.csv',sep=',',row.names=F,quote=F)
 goi <- read.table('resfiles/goi.csv',sep=',',header=T)
 
-goi %>% dplyr::filter(method %in% c('Using true ages (constant)','Using Relate est. ages with branch avg.')) %>% dplyr::filter(gam<0) %>%
+goi %>% dplyr::filter(method %in% c('Using true ages (constant)','Using true ages (AFR-like)')) %>% #dplyr::filter(gam<0) %>%
 ggplot() + geom_point(aes(x=gam,y=val,color=method,fill=method)) + theme_bw() +
     geom_smooth(aes(x=gam,y=val,color=method,fill=method),method='loess',) +
-    scale_x_continuous(trans='pseudo_log',breaks=c(100,10,1,0,-1,-10,-100),labels=c(100,10,1,0,-1,-10,-100)) + 
-  scale_color_manual(values=c('grey60','grey20','grey20')) + scale_fill_manual(values=c('grey60','grey20','grey20')) + 
-  scale_y_continuous(trans='log10') + 
+    scale_x_continuous(trans='pseudo_log',breaks=c(100,10,0,-10,-100),labels=function(x)x/20000) + 
+  scale_color_manual(values=c('grey60','grey20','grey20'),labels=c('Using true ages (exponential growth)','Using true ages (constant)')) + scale_fill_manual(values=c('grey60','grey20','grey20'),labels=c('Using true ages (exponential growth)','Using true ages (constant)')) + 
+  scale_y_continuous(trans='log10',breaks=c(1,10,100,10000)) +
     geom_hline(yintercept=1., linetype="dashed", color = "grey50", size=2) +
-    labs(x=TeX('$\\gamma$'),y='ratio of Var') +
+    labs(x='s',y='ratio of Var') +
     guides(color = guide_legend(override.aes = list(fill = "white"))) +
     theme(axis.text = element_text(size = 12),
           axis.title = element_text(size = 16),
-          legend.position=c(0.4,0.15))
-ggsave('~/selCoefEst/figs/RatioSDcontantRel.jpeg',height=5,width=7)
+          legend.position=c(0.4,0.55))
+ggsave('~/selCoefEst/figs/RatioSDall.jpeg',height=5,width=7)
 ```
 
 
@@ -337,7 +335,7 @@ df4 %>% dplyr::filter(tid %in% c(1,8,16,23,31,35)) %>% dplyr::mutate(xpos=rep(re
 
 
 ```{r}
-finalest2 <- read.table('resfiles/finalRes2023-08-11pos.csv',header=T,sep=',')[1000:1,]
+finalest2 <- read.table('resfiles/finalRes2023-07-28pos.csv',header=T,sep=',')[1000:1,]
 
 Exp <- read.table('~/selCoefEst/PReFerSims/resfiles/exp.csv',header=T,skip=2,sep=',')
 
@@ -348,24 +346,26 @@ imspos <- t(matrix(finalest2[,5],20,50,byrow=F))
 
 ratio.var.pos<-colVar(parestfreqpos)/colVar(parestagepos)
 
-df <- data.frame(gam=c(big.gamma[as.integer(seq(1,49,length.out=22))],-unique(finalest2[,2]),Exp$gamma),
-                 rsd=c(2*log2(ratio.sd[as.integer(seq(1,49,length.out=22))]),log2(ratio.var.pos),Exp$KLdiv),
+df <- data.frame(gam=c(big.gamma[as.integer(seq(1,49,length.out=22))],unique(-finalest2[,2]),Exp$gamma),
+                 rsd=c(ratio.sd[as.integer(seq(1,49,length.out=22))],ratio.var.pos,Exp$KLdiv),
                  method=c(rep('Using true ages',42),rep('KL divergence (expected)',59)))
 
-ggplot(df) + geom_point(data=subset(df,method != 'KL divergence (expected)'),aes(x=gam,y=rsd,color=method,fill=method),size=3,show.legend=F) + theme_bw() + 
-  geom_line(data=subset(df,method=='KL divergence (expected)'),aes(x=gam,y=rsd,color=method),linewidth=2) + 
-  scale_color_manual(values=c('firebrick','grey20')) +  scale_fill_manual(values=c('white','grey20')) + 
-    geom_smooth(data=subset(df,method != 'KL divergence (expected)'),aes(x=gam,y=rsd,color=method,fill=method),method='loess',size=2,show.legend=F) + 
+ggplot(df) + 
+  geom_point(data=subset(df,method != 'KL divergence (expected)'),aes(x=gam,y=rsd,color=method,fill=method),size=3,show.legend=F) +
+  theme_bw() + 
+  # geom_line(data=subset(df,method =='KL divergence (expected)'),aes(x=gam,y=rsd,color=method),linewidth=2) + 
+  scale_color_manual(values=c('grey20','firebrick')) +  scale_fill_manual(values=c('grey60','grey20')) + 
+    geom_smooth(data=subset(df,method != 'KL divergence (expected)'),aes(x=gam,y=rsd,color=method,fill=method),method='loess',size=2,show.legend=F) +
     scale_x_continuous(trans='pseudo_log',breaks=c(100,10,1,0,-1,-10,-100),labels=c(100,10,1,0,-1,-10,-100))+
-    geom_hline(yintercept=0, linetype="dashed", color = "grey50", size=2) +
+    geom_hline(yintercept=1, linetype="dashed", color = "grey50", size=2) +
   guides(color = guide_legend(override.aes = list(fill = "white"))) + 
-    labs(x=TeX('$\\gamma$'),y='log(ratio of SE)') +
-    theme(axis.text=element_text(size=rel(1)),
-        axis.title=element_text(size=rel(1.),face="bold"),
-        legend.position=c(0.25,0.8),
+    labs(x=TeX('$\\gamma$'),y='ratio of Var') + scale_y_continuous(trans='log10') +
+  theme(axis.text=element_text(size=rel(1)),
+        axis.title=element_text(size=rel(1.)),
+        legend.position="none",#c(0.25,0.8),
         legend.text=element_text(size=rel(1.)),
-        legend.title=element_text(size=rel(1.))) 
-ggsave('~/selCoefEst/figs/gaininfo.jpeg',height=7,width=9)
+        legend.title=element_text(size=rel(1.)))
+ggsave('~/selCoefEst/figs/gaininfo_onlyratiovar.jpeg',height=7,width=9)
 ```
 
 ```{r}
@@ -376,6 +376,46 @@ lines(x,1/x,col='black',lwd=2)
 points(x,fx10,col='grey80',pch=20,cex=2)
 points(x,fx100,col='grey40',pch=20,cex=2)
 abline(v=0.025,col='dodgerblue3',lty=5,lwd=5)
+```
+
+### Timings for different _n_ and _Amax_
+
+```{r}
+library(readxl)
+timings <- read_excel("~/selCoefEst/figs/timings.xlsx")
+```
+
+```{r}
+ggplot(timings, aes(x = Amax, y = time, color = as.factor(twon), linetype = method)) +
+  geom_line(size = 1.5) + # Add lines with different colors and linetypes
+  # geom_point(size = 3, shape = 19) + 
+  scale_x_log10() + # Log scale for x-axis
+  scale_y_log10() + # Log scale for y-axis
+  scale_color_grey(start = 0.8, end = 0.2) + # Greyscale colors for `twon`
+  labs(x = expression(A[max]), y = "Time (s)", color = "2n", linetype = "Method") + # Axis and legend labels
+  scale_linetype_manual(values = c("dashed", "dotted", "solid")) + 
+  theme_bw() + # Minimal theme
+  theme(legend.position = "right", # Position the legend
+        legend.title = element_text(face = "bold"), # Bold legend title
+        legend.text = element_text(size = 10)) # Size of legend text
+ggsave('~/selCoefEst/figs/timings_Amax.jpeg',height=7,width=9)
+
+timings %>%
+  filter(Amax %in% c(1000, 5000, 20000)) %>%
+# Plot using the filtered data
+ggplot(aes(x = twon, y = time, color = as.factor(Amax), linetype = method)) +
+  geom_line(size = 1.5) + # Add lines with different colors and linetypes
+  # geom_point(size = 3, shape = 19) + 
+  scale_x_log10() + # Log scale for x-axis
+  scale_y_log10() + # Log scale for y-axis
+  scale_color_grey(start = 0.8, end = 0.2) + # Greyscale colors for `twon`
+  labs(x = "2n", y = "Time (s)", color = expression(A[max]), linetype = "Method") + # Axis and legend labels
+  scale_linetype_manual(values = c("dashed", "dotted", "solid")) + 
+  theme_bw() + # Minimal theme
+  theme(legend.position = "right", # Position the legend
+        legend.title = element_text(face = "bold"), # Bold legend title
+        legend.text = element_text(size = 10)) # Size of legend text
+ggsave('~/selCoefEst/figs/timings_2n.jpeg',height=7,width=9)
 ```
 
 
