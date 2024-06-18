@@ -408,9 +408,9 @@ def matrix_evolve(changepoints, probvec, probdict, initvec, lenNc):
 
     return mom
 
-def run_mom_iterate_changing5(n, s, Nc, theta):
+def run_mom_iterate_changing5(twon, s, Nc, theta):
     """function computing the moments equations using matrix of probability transitions instead of iterating through generations"""
-    mom = np.zeros((len(Nc)+1,n+1),dtype=np.float64)
+    mom = np.zeros((len(Nc)+1,twon+1),dtype=np.float64)
 
     probslv = {}; probQ = {}; probdict = {}
 
@@ -419,14 +419,14 @@ def run_mom_iterate_changing5(n, s, Nc, theta):
     changepoints = np.concatenate((np.array([1]),np.where(Nc[:-1] != Nc[1:])[0]+1),axis=0)  
 
     # only need to do this once - no dependence on N
-    J = calcJK13(n)
-    S = 0.5 * s * calcS(n+1, J)
+    J = calcJK13(twon)
+    S = 0.5 * s * calcS(twon+1, J)
 
-    # print('Constructing probability transition matrices for each epoch',end='...')
+    print('Constructing probability transition matrices for each epoch',end='...')
     
     # creating a list of probability transition matrices for each 'epoch' (starting from the last 'epoch' and working forwards)
     for _, ep in enumerate(changepoints):
-        D = 0.25/Nc[ep] * calcD(n+1)
+        D = 0.25/Nc[ep] * calcD(twon+1)
         # forward &  backward steps for stabilty
         slv = linalg.factorized(sp.sparse.identity(S.shape[0], dtype="float", format="csc") - 0.5 * (D + S))
         Q = sp.sparse.identity(S.shape[0], dtype="float", format="csc") + 0.5 * (D + S)
@@ -439,14 +439,15 @@ def run_mom_iterate_changing5(n, s, Nc, theta):
         # contains the matrix powers for the whole epoch (saves you the time for calculating them later)
         # superprobdict[ep] = np.linalg.matrix_power(probdict[ep],np.append(changepoints,len(Nc))[iep+1]-changepoints[iep])
         
-    initvec = np.array([0]+[n*0.25*theta]+[0]*(n-1))
+    # initvec = np.array([0]+[twon*0.25*theta]+[0]*(twon-1))
+    initvec = np.array([0]+[twon*0.25*theta]+[0]*(twon-1))
     
-    # print('done!\n Starting SFAS construction: ')
+    print('done!\n Starting SFAS construction: ')
 
     probvec = probdict[changepoints[0]]
     mom[1,] = probvec @ initvec
     # mom[1,] = probslv[changepoints[0]](probQ[changepoints[0]].dot(initvec))
-    mom[1,0] = 0; mom[1,n] = 0
+    mom[1,0] = 0; mom[1,twon] = 0
 
     for gen in np.arange(2,len(Nc)+1):
         # indicator for which prob transition matrix to use (should be the oldest one that is still younger than the current gen)
@@ -455,15 +456,16 @@ def run_mom_iterate_changing5(n, s, Nc, theta):
         # (if gen is in the most recent epoch, then run for gen gens, otherwise for (gen - next epoch) gens)
         # mom[gen,] = probslv[changepoints[whichep]](probQ[changepoints[whichep]].dot(mom[gen-1,])) 
         probvec = probvec @ probdict[changepoints[whichep]]
-        mom[gen,] = probvec @ initvec
+        # mom[gen,] = probvec @ initvec 
+        mom[gen,] = initvec[1] * probvec[:, 1] 
 
-    mom[:,0] = 0; mom[:,n] = 0
+        if gen*100/len(Nc)%20 == 0 and gen/len(Nc) < 1:
+            print('{:d}%'.format(int(gen*100/len(Nc))), end='...')
+    
+    mom[:,0] = 0; mom[:,twon] = 0
+    print('done!')
 
-    #     if gen*100/len(Nc)%20 == 0 and gen/len(Nc) < 1:
-    #         print('{:d}%'.format(int(gen*100/len(Nc))), end='...')
-    # print('done!')
-
-    return mom#[:-1,:]
+    return mom/Nc[-1]#[:-1,:]
 
 def run_mom_iterate_theta_changing(n, s, Nc, theta):
     mom = np.zeros((len(Nc)+1,n+1),dtype=np.float32)
