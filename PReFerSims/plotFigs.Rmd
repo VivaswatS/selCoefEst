@@ -77,7 +77,6 @@ ggplot() + geom_point(aes(x=gam,y=val,color=method,fill=method)) + theme_bw() +
     geom_smooth(aes(x=gam,y=val,color=method,fill=method),method='loess',) +
     scale_x_continuous(trans='pseudo_log',breaks=c(0,-1,-10,-100),labels=c(0,-1,-10,-100)) + 
   scale_color_manual(values=c('grey50','grey20','grey80')) + scale_fill_manual(values=c('grey50','grey20','grey80')) +
-    geom_hline(yintercept=1., linetype="dashed", color = "grey50", linewidth=1) +
     labs(x=TeX('$\\gamma$'),y='ratio of Var') +
     guides(color = guide_legend(override.aes = list(fill = "white"))) +
     theme(axis.text = element_text(size = 12),
@@ -112,13 +111,14 @@ df4<-data.frame(tid=rep(rep(1:20,each=100),4),
                 method=c(rep('Freq only',2000),rep('Freq & age with true ages',2000),rep('Freq & age with Relate est.',2000),rep('Freq & age with branch avg.',2000)),
                 est=c(as.vector(fo),as.vector(ta),as.vector(rm),as.vector(ims)))
 
-#dplyr::filter(method %in% c('SFS','SFAS with true ages','SFAS with Relate est.','SFAS with imp. samp.'))
-df4 %>% dplyr::filter(tid %in% c(1,5,9,13,17,19)) %>% dplyr::filter(method %in% c('Freq only','Freq & age with true ages','Freq & age with Relate est.','Freq & age with branch avg.')) %>% dplyr::mutate(xpos=rep(rep(c(1,6,11,14.5,18,20),each=100),4)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_violin(aes(x=xpos,y=est,fill=method),position='dodge',trim=T,scale='width') + 
-    # stat_summary(aes(x=factor(tid),y=est,fill=method),fun.data=mean_sdl, geom="pointrange", color="black",position=position_dodge(width = 1.9),size=0.1) +
-    geom_hline(aes(yintercept=sim),color='grey50',lty=2,size=0.5) + 
+# dplyr::filter(method %in% c('SFS',
+df4 %>% dplyr::filter(tid %in% c(1,5,9,13,17,19)) %>% 
+dplyr::filter(method %in% c('Freq only','Freq & age with true ages','Freq & age with Relate est.','Freq & age with branch avg.')) %>% dplyr::mutate(xpos=rep(rep(c(1,6,11,14.5,18,20),each=100),4)) %>% ggplot(aes(x=xpos,y=est,group=interaction(factor(tid),method))) + geom_violin(aes(x=xpos,y=est,fill=method),position='dodge',trim=F,scale='width') +
+# stat_summary(aes(x=factor(tid),y=est,fill=method),fun.data=mean_sdl, geom="pointrange", color="black",position=position_dodge(width = 1.9),size=0.1) +
+    # geom_hline(aes(yintercept=sim),color='grey50',lty=2,size=0.5) + 
     labs(x=TeX('$\\gamma$'), y = TeX('$\\hat{\\gamma}$')) +
   scale_fill_manual(values=c('grey80','steelblue','grey40','goldenrod')) + 
-    scale_y_continuous(trans='pseudo_log',breaks=c(10,1,0,-1,-10,-100),labels=c(10,1,0,-1,-10,-100)) + 
+    # scale_y_continuous(trans='pseudo_log',breaks=c(10,1,0,-1,-10,-100),labels=c(10,1,0,-1,-10,-100)) + 
     scale_x_discrete(breaks=c(1,11,18,20),labels=c(-100,-10,-1,0),limits=1:20) +
     theme_bw() + theme(axis.text = element_text(size = rel(1.2)),
                        axis.title = element_text(size = rel(1.5)),
@@ -335,9 +335,10 @@ df4 %>% dplyr::filter(tid %in% c(1,8,16,23,31,35)) %>% dplyr::mutate(xpos=rep(re
 
 
 ```{r}
-finalest2 <- read.table('resfiles/finalRes2023-07-28pos.csv',header=T,sep=',')[1000:1,]
+finalest2 <- read.table('resfiles/finalRes2023-04-11pos.csv',header=T,sep=',')[1000:1,]
 
 Exp <- read.table('~/selCoefEst/PReFerSims/resfiles/exp.csv',header=T,skip=2,sep=',')
+Exp$KLdiv2 <- c(2.0090824854405276, 1.666203826580241, 1.3699784705823839, 1.109041813353198, 0.8802596173227772, 0.6933037846988053, 0.5410491353603653, 0.4166560103472778, 0.3149237293767293, 0.2319113934838755, 0.16465114722021457, 0.11099809136825024, 0.06969977798586147, 0.04002068139515878, 0.02078196637956914, 0.009800657257672422, 0.004288727365170535, 0.0017946231802553041, 0.0007365059813240499, 0.0003005466252095847, 0.00012241761449630312, 3.4996394202749356e-05, 8.44173969918188e-06, 1.5983234451430857e-06, 2.4267279906427914e-07, 8.815858867224725e-08, 4.449624911447693e-08, -7.02542174545952e-08, 2.938102016340193e-08, 8.136112727494414e-08, -7.688453229784999e-08, -4.2119803031923755e-08, 6.247956837897295e-08, 1.5650371573225504e-08, 2.4180051684167094e-07, 1.9304754468237875e-06, 1.0241226887326552e-05, 4.4356266926816107e-05, 0.00016173112109834926, 0.0004102335303577749, 0.0010376887199424183, 0.002610980706193463, 0.006528114061678894, 0.016219453284344203, 0.03990937276499037, 0.09597007769112413, 0.22022583497771503, 0.47072639803619654, 0.9257392230472633, 1.6785197500385332, 2.8367096020096563, 4.5278671231100605, 6.907585299306136, 10.16915922401834, 14.55494972375334, 20.369806544103913, 27.333369372607848, 33.81132639531564, 39.39459198136918)
 
 parestfreqpos <- t(matrix(finalest2[,4],20,100,byrow=F))
 parestagepos <- t(matrix(finalest2[,3],20,100,byrow=F))
@@ -351,21 +352,21 @@ df <- data.frame(gam=c(big.gamma[as.integer(seq(1,49,length.out=22))],unique(-fi
                  method=c(rep('Using true ages',42),rep('KL divergence (expected)',59)))
 
 ggplot(df) + 
-  geom_point(data=subset(df,method != 'KL divergence (expected)'),aes(x=gam,y=rsd,color=method,fill=method),size=3,show.legend=F) +
+  # geom_point(data=subset(df,method == 'KL divergence (expected)'),aes(x=gam,y=rsd,color=method,fill=method),size=3,show.legend=F) +
   theme_bw() + 
-  # geom_line(data=subset(df,method =='KL divergence (expected)'),aes(x=gam,y=rsd,color=method),linewidth=2) + 
-  scale_color_manual(values=c('grey20','firebrick')) +  scale_fill_manual(values=c('grey60','grey20')) + 
-    geom_smooth(data=subset(df,method != 'KL divergence (expected)'),aes(x=gam,y=rsd,color=method,fill=method),method='loess',size=2,show.legend=F) +
+  geom_line(data=subset(df,method %in% c('KL divergence (expected)')),aes(x=gam,y=rsd,color=method),linewidth=2) +
+  scale_color_manual(values=c('firebrick','black')) +  scale_fill_manual(values=c('grey60','grey20')) + 
+    # geom_smooth(data=subset(df,method != 'KL divergence (expected)'),aes(x=gam,y=rsd,color=method,fill=method),method='loess',size=2,show.legend=F) +
     scale_x_continuous(trans='pseudo_log',breaks=c(100,10,1,0,-1,-10,-100),labels=c(100,10,1,0,-1,-10,-100))+
-    geom_hline(yintercept=1, linetype="dashed", color = "grey50", size=2) +
+    geom_hline(yintercept=0, linetype="dashed", color = "grey50", size=2) +
   guides(color = guide_legend(override.aes = list(fill = "white"))) + 
-    labs(x=TeX('$\\gamma$'),y='ratio of Var') + scale_y_continuous(trans='log10') +
-  theme(axis.text=element_text(size=rel(1)),
-        axis.title=element_text(size=rel(1.)),
+    labs(x=TeX('$\\gamma$'),y='KL divergence') + #scale_y_continuous(trans='log10') +
+  theme(axis.text=element_text(size=rel(1.5)),
+        axis.title=element_text(size=rel(1.5)),
         legend.position="none",#c(0.25,0.8),
         legend.text=element_text(size=rel(1.)),
         legend.title=element_text(size=rel(1.)))
-ggsave('~/selCoefEst/figs/gaininfo_onlyratiovar.jpeg',height=7,width=9)
+ggsave('~/selCoefEst/figs/gaininfo_onlykl.jpeg',height=7,width=9)
 ```
 
 ```{r}

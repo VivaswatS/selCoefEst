@@ -1,17 +1,18 @@
 ## R master script to run entire workflow from PReFerSim -> mssel -> Relate
 ## Jan 30, 2023
 library(latex2exp)
-setwd("/Users/vivaswatshastry/selCoefEst/PReFerSims/")
+# setwd("/Users/vivaswatshastry/selCoefEst/PReFerSims/")
 options(scipen=999)
 
-gamma <- 10 # change Mutation rate accordingly (200 for -10, 400 for -100)
-
+gamma <- -10 # change theta accordingly (200 for -10, 400 for -100)
+theta <- 200
+    
 ## this is for a single selection coefficient 
 
 #----------------PReFerSim----------------#
 
 simfile <- read.delim("simfiles/ParameterFilesConstant.txt",header=F,sep=":")
-simfile[1,2] <- paste0(" ",400)
+simfile[1,2] <- paste0(" ",theta)
 simfile[3,2] <- paste0(" ",gamma*0.5/10000)
 simfile[8,2] <- paste0(" outfiles/ConstantSize",gamma,".0")
 write.table(simfile,"simfiles/ParameterFilesConstant.txt",
@@ -39,7 +40,7 @@ alleles <- matrix(alleles,ncol=1)
 # edit the FreqTraj file (no need to do this unless running a new gamma)
 
 simfile <- read.delim("simfiles/ParameterFilesFreqTraj.txt",header=F,sep=":")
-simfile[1,2] <- paste0(" ", 400)
+simfile[1,2] <- paste0(" ", theta)
 simfile[3,2] <- paste0(" ",gamma*0.5/10000)
 simfile[7,2] <- paste0(" outfiles/ConstantSize",gamma,".0")
 simfile[8,2] <- paste0(" MiniTest/Alleles",gamma,".0.txt")
@@ -119,7 +120,7 @@ for(al in alleles[,1]){
 
 setwd("~/selCoefEst/PReFerSims/msselfiles/gevafiles")
 
-#----------------GEVA#----------------#
+#----------------GEVA----------------#
 
 cnt <- 1
 for(al in alleles[,1]){
