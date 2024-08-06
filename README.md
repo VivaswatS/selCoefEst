@@ -1,14 +1,14 @@
-## Exploring the utility of allele ages for estimation of selection coefficients
+# Allele ages provide limited information about the strength of negative selection
 
-This repository contains code for the models developed in []. 
+This repository contains code for the models developed here: . 
 
-### manual.ipynb
+### manual.ipynb (this is what you'll need)
 
 notebook containing explanatory code for using the functions below
 
 ### mom\_functions.py
 
-script containing the necessary source functions
+script containing the necessary source code
 
 ### PReFerSims/
 
