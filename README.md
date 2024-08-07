@@ -1,6 +1,6 @@
 # Allele ages provide limited information about the strength of negative selection
 
-This repository contains code for the models developed here: . 
+This repository contains code for the models developed in this manuscript: [https://doi.org/10.1101/2024.08.06.606888](https://doi.org/10.1101/2024.08.06.606888). 
 
 ### manual.ipynb (this is what you'll need)
 
@@ -20,6 +20,6 @@ folder containing figures for the manuscript
 
 ### archive/
 
-folder containing old _tensorflow_ code for computing the distribution of allele ages condiitional on frequency
+folder containing old _tensorflow_ code for computing the distribution of allele ages conditional on frequency
 
-Contact Vivaswat [here](mailto:vivaswat@uchicago.edu) for questions with running any of the code in this repo. 
+Contact [Vivaswat](mailto:vivaswat@uchicago.edu) for questions with running any of the code in this repo. 
