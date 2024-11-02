@@ -13,7 +13,7 @@ pandoc_args: "--webtex"
 
 ```{r}
 library(Rcpp)
-# library(expint)
+library(expint)
 library(MASS)
 # library(gplots)
 library(ggplot2)
@@ -454,6 +454,23 @@ There is quite a good correlation (~0.97) between mean allele age (from 50 sims)
 ```{r}
 plot(mean.all.age,all.age,pch=20,col="grey40")
 abline(0,1,col="red",lty=2)
+```
+
+## Plotting average age across $\gamma$ and $x\%$
+
+```{r}
+gam <- 10^seq(-2,2,0.1)
+x0.001 <- sapply(gam, function(g){exp.al(0.001, g, 10000)})
+x0.01 <- sapply(gam, function(g){exp.al(0.01, g, 10000)})
+x0.1 <- sapply(gam, function(g){exp.al(0.1, g, 10000)})
+
+jpeg('~/selCoefEst/figs/maruyamaest.jpg', width=1000, height=600, quality=2500, pointsize=20)
+plot(gam, x0.001, col='grey80', log='x', type='l', frame.plot=F, lwd=4, xlab=TeX('$\\gamma$'), ylab='Allele age (in units of 2N gens)', ylim=c(0,0.6)) 
+lines(gam, x0.01, col='grey50', lwd=4) 
+grid(); abline(v=1.,lwd=2,lty=3,col='grey')
+lines(gam, x0.1, col='grey20', lwd=4) 
+legend('topright', legend=c('0.1%', '1%', '10%'), col=c('grey80','grey50','grey20'), lwd=4, bty='n')
+dev.off()
 ```
 
 ## Obtaining likelihood estimates 

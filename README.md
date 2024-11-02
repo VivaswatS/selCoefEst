@@ -2,7 +2,7 @@
 
 This repository contains code for the models developed in this manuscript: [https://doi.org/10.1101/2024.08.06.606888](https://doi.org/10.1101/2024.08.06.606888). 
 
-### manual.ipynb (this is what you'll need)
+### manual.ipynb (this is all that you'll need)
 
 notebook containing explanatory code for using the functions below
 

@@ -204,3 +204,42 @@ legend('bottomright',c(TeX('$\\gamma=-100$'),TeX('$\\gamma=-1$')),col=c('grey80'
 library(ape)
 # tt<-read.tree('/Users/vivaswatshastry/selCoefEst/PReFerSims/msselfiles/haps5.0_r0.newick')
 tt <- read.tree(text='((5:0.123237,6:0.123237):0.866739,(3:0.322997,(1:0.221121,(2:0.058565,4:0.058565):0.162556):0.101876):0.666980);')
+
+## plotting thresholded SFS
+compute_sfs <- function(n, gamma) {
+    x <- seq(1/(2*n), 1-1/(2*n), length.out=n-1)
+    sfs <- (1-exp(-2*gamma*(1-x))) / (x*(1-x)*(1-exp(-2*gamma)))
+    return(sfs / sum(sfs))
+}
+
+# Set parameters
+n <- 10000  # sample size
+gamma_values <- c(0, -1, -5, -10, -50, -100)  # selection strengths
+colors <- gray.colors(length(gamma_values), start=0.2, end=0.8)
+
+# Compute SFS for each gamma value
+sfs_list <- lapply(gamma_values, function(g) compute_sfs(n, g))
+
+# Prepare data for plotting
+plot_data <- data.frame(
+    frequency = rep(seq(1/(2*n), 1-1/(2*n), length.out=n-1), length(gamma_values)),
+    density = unlist(sfs_list),
+    gamma = factor(rep(gamma_values, each=n-1))
+)
+
+# Create the plot
+ggplot(plot_data, aes(x=frequency, y=density, color=gamma)) +
+    geom_line(size=2) +
+    scale_color_manual(values=colors) + scale_x_log10() + scale_y_log10(limits=c(1e-10,1)) +
+    labs(x="Allele Frequency", y="Density", 
+         title="Expected Site Frequency Spectrum under Selection",
+         color="γ", linetype="γ") +
+    theme_classic() + 
+    theme(legend.position="right") + 
+    geom_vline(xintercept=0.025,linetype='dashed',color='dodgerblue4',size=1.5) + 
+    geom_abline(slope=-1,color='black')
+
+
+
+
+
